@@ -1,5 +1,4 @@
-import { cloneMockState } from './mock-state.js';
-import { diagnosticState } from './utils.js';
+import { createNoDataState } from './empty-state.js';
 
 function defaultBaseUrl() {
   const isTailscaleHttps = window.location.protocol === "https:" && window.location.hostname.endsWith(".ts.net");
@@ -30,8 +29,9 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
   async getState() {
     const currentSettings = effectiveSettings(settings);
     if (!currentSettings.baseUrl) {
-      setConnectionState({ mode: "mock", label: "Mock mode" });
-      return cloneMockState();
+      const reason = "Backend is not configured. Open Config and add the Jarad backend URL and token.";
+      setConnectionState({ mode: "disconnected", label: "No backend" });
+      return createNoDataState(reason);
     }
 
     try {
@@ -46,19 +46,19 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
       });
       return data;
     } catch (error) {
-      addAudit("API fallback", "app", "warning", error.message);
+      const reason = `Could not load live data: ${error.message}`;
+      addAudit("API unavailable", "app", "warning", error.message);
       setConnectionState({
-        mode: "fallback",
-        label: `Fallback: ${error.message}`
+        mode: "disconnected",
+        label: "No live data"
       });
-      return cloneMockState();
+      return createNoDataState(reason);
     }
   },
   async executeAction(action, auth = {}) {
     const currentSettings = effectiveSettings(settings);
     if (!currentSettings.baseUrl) {
-      addAudit(action.title, action.target, "simulated", "No backend configured");
-      return { simulated: true };
+      throw new Error("Backend is not configured");
     }
 
     const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}/api/admin/actions/${action.id}`, {
@@ -91,10 +91,7 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
   async getServiceLogs(serviceId, limit = 100) {
     const currentSettings = effectiveSettings(settings);
     if (!currentSettings.baseUrl) {
-      return {
-        service: serviceId,
-        logs: getState().logs.filter((log) => log.service === serviceId || log.service === "backup")
-      };
+      throw new Error("Backend is not configured");
     }
 
     const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}/api/services/${serviceId}/logs?limit=${limit}`, {
@@ -106,19 +103,7 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
   async getServiceDiagnostics(serviceId) {
     const currentSettings = effectiveSettings(settings);
     if (!currentSettings.baseUrl) {
-      const service = getState().services.find((item) => item.id === serviceId);
-      return {
-        service: serviceId,
-        checks: (service?.diagnostics || []).map(([label, detail]) => {
-          const state = diagnosticState(detail);
-          return {
-            label,
-            state: state === "bad" ? "fail" : state === "warn" ? "warn" : "pass",
-            detail
-          };
-        }),
-        suggestedFix: null
-      };
+      throw new Error("Backend is not configured");
     }
 
     const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}/api/services/${serviceId}/diagnostics`, {

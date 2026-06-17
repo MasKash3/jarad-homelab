@@ -174,14 +174,35 @@ button {
   color: var(--good);
 }
 
-.connection-chip.fallback {
+.connection-chip.fallback,
+.connection-chip.disconnected {
   background: var(--warn-bg);
   color: var(--warn);
 }
 
-.connection-chip.mock {
-  background: var(--surface-2);
+.no-data-panel {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px dashed rgba(143, 160, 173, .42);
+  border-radius: var(--radius);
+  background: rgba(17, 26, 34, .6);
   color: var(--muted);
+}
+
+.no-data-panel strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.no-data-panel span {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.metric-grid .no-data-panel,
+.launcher-grid .no-data-panel {
+  grid-column: 1 / -1;
 }
 
 .status-dot {

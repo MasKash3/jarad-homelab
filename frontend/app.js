@@ -1,5 +1,5 @@
 import { configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js';
-import { cloneMockState } from './js/mock-state.js';
+import { createNoDataState } from './js/empty-state.js';
 import { createApi } from './js/api.js';
 import { verifyFingerprint } from './js/auth.js';
 import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js';
@@ -11,10 +11,10 @@ let pendingAction = null;
 let pendingService = null;
 let activeServiceId = null;
 let pendingAuth = null;
-let state = cloneMockState();
+let state = createNoDataState();
 let connectionState = {
-  mode: "mock",
-  label: "Mock mode"
+  mode: "disconnected",
+  label: "No backend"
 };
 
 const api = createApi({
@@ -47,6 +47,15 @@ function hasAutoBackend() {
   return window.location.protocol === "https:" && window.location.hostname.endsWith(".ts.net");
 }
 
+function noDataPanel(title, message) {
+  return `
+    <article class="no-data-panel">
+      <strong>${escapeHtml(title)}</strong>
+      <span>${escapeHtml(message)}</span>
+    </article>
+  `;
+}
+
 function render() {
   renderDashboard();
   renderServices();
@@ -58,9 +67,10 @@ function render() {
 
 function renderDashboard() {
   $("#overallStatus").textContent = state.server.status;
+  $(".status-strip .status-dot").className = `status-dot ${state.isEmpty ? "warn" : "good"}`;
   $("#connectionState").textContent = connectionState.label;
   $("#connectionState").className = `connection-chip ${connectionState.mode}`;
-  $("#lastUpdated").textContent = `Updated ${formatUpdated(state.updatedAt)}`;
+  $("#lastUpdated").textContent = state.isEmpty ? "No live update" : `Updated ${formatUpdated(state.updatedAt)}`;
   $("#dashboardTitle").textContent = state.server.uptime;
   $("#healthScore").textContent = state.server.healthScore;
   $("#metricGrid").innerHTML = state.metrics.map((metric) => `
@@ -74,7 +84,7 @@ function renderDashboard() {
         <span style="--value:${Number(metric.value) || 0}%"></span>
       </div>
     </article>
-  `).join("");
+  `).join("") || noDataPanel("No Metrics", state.emptyReason || "Live server metrics are unavailable.");
   $("#raidState").textContent = state.storage.raid;
   $("#storageUsedBar").style.setProperty("--value", `${state.storage.usedPct}%`);
   $("#storageUsedBar").style.setProperty("--bar-color", colorForState(state.storage.usedPct > 80 ? "bad" : state.storage.usedPct > 65 ? "warn" : "good"));
@@ -90,7 +100,7 @@ function renderDashboard() {
       <b>${escapeHtml(service.icon)}</b>
       <span>${escapeHtml(service.name)}</span>
     </a>
-  `).join("");
+  `).join("") || noDataPanel("No Apps Loaded", "Service launchers appear after the backend responds.");
 }
 
 function renderServices() {
@@ -111,7 +121,7 @@ function renderServices() {
       <span class="pill ${escapeAttr(stateClass(service))}">${escapeHtml(formatHealth(service.health))}</span>
       <svg class="row-chevron"><use href="#icon-link"></use></svg>
     </button>
-  `).join("") || emptyState("No services match this filter.");
+  `).join("") || emptyState(state.isEmpty ? "No live services loaded. Connect to the backend to view containers." : "No services match this filter.");
 
   $$("#serviceList [data-service-id]").forEach((button) => {
     button.addEventListener("click", () => openService(button.dataset.serviceId));
@@ -135,7 +145,7 @@ function renderLogs() {
       </header>
       <p>${escapeHtml(log.message)}</p>
     </article>
-  `).join("") || emptyState("No log entries found.");
+  `).join("") || emptyState(state.isEmpty ? "No live logs loaded. Connect to the backend to view recent events." : "No log entries found.");
 }
 
 function renderLiveTailButton() {
@@ -176,7 +186,7 @@ function renderConfig() {
   const settings = readSettings();
   $("#authMethodState").textContent = authMethodLabel();
   $("#authMethodHelp").textContent = "TOTP is active for protected actions.";
-  $("#backendState").textContent = settings.baseUrl || hasAutoBackend() ? "Configured" : "Mock data";
+  $("#backendState").textContent = settings.baseUrl || hasAutoBackend() ? "Configured" : "Not connected";
   $("#configList").innerHTML = configActions.map((item) => `
     <article class="config-card">
       <div>
