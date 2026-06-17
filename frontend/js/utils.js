@@ -33,10 +33,13 @@ export function formatResource(value, max, unit) {
   return `${value} ${unit} / ${max} ${unit}`;
 }
 
-export function diagnosticState(value) {
+export function diagnosticState(value, explicitState) {
+  if (explicitState === "fail") return "bad";
+  if (explicitState === "warn") return "warn";
+  if (explicitState === "pass") return "good";
   const text = String(value).toLowerCase();
-  if (text.includes("error") || text.includes("failed") || text.includes("none") === false && text.includes("warning")) return "warn";
-  if (text.includes("elevated") || text.includes("warning")) return "warn";
+  if (text.includes("stopped") || text.includes("failed") || text.includes("unavailable") || text.includes("error") || text.includes("not running")) return "bad";
+  if (text.includes("degraded") || text.includes("elevated") || text.includes("warning") || text.includes("unchecked") || text.includes("unknown")) return "warn";
   return "good";
 }
 

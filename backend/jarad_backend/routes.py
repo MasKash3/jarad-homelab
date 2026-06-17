@@ -19,6 +19,17 @@ router = APIRouter()
 protected = [Depends(require_token)]
 
 
+def diagnostic_state(value: str) -> str:
+    text = value.lower()
+    fail_terms = ("stopped", "failed", "unavailable", "error", "not running")
+    warn_terms = ("degraded", "warning", "elevated", "unchecked", "unknown")
+    if any(term in text for term in fail_terms):
+        return "fail"
+    if any(term in text for term in warn_terms):
+        return "warn"
+    return "pass"
+
+
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "host": socket.gethostname()}
@@ -133,7 +144,7 @@ def service_diagnostics(service_id: str) -> dict[str, Any]:
     return {
         "service": service_id,
         "checks": [
-            {"label": label, "state": "pass" if value.lower() not in {"stopped", "failed"} else "fail", "detail": value}
+            {"label": label, "state": diagnostic_state(value), "detail": value}
             for label, value in service["diagnostics"]
         ],
         "suggestedFix": None if service["health"] == "healthy" else "Open service logs and verify container dependencies.",

@@ -1,4 +1,5 @@
 import { cloneMockState } from './mock-state.js';
+import { diagnosticState } from './utils.js';
 
 function defaultBaseUrl() {
   const isTailscaleHttps = window.location.protocol === "https:" && window.location.hostname.endsWith(".ts.net");
@@ -108,11 +109,14 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
       const service = getState().services.find((item) => item.id === serviceId);
       return {
         service: serviceId,
-        checks: (service?.diagnostics || []).map(([label, detail]) => ({
-          label,
-          state: String(detail).toLowerCase().includes("failed") ? "fail" : "pass",
-          detail
-        })),
+        checks: (service?.diagnostics || []).map(([label, detail]) => {
+          const state = diagnosticState(detail);
+          return {
+            label,
+            state: state === "bad" ? "fail" : state === "warn" ? "warn" : "pass",
+            detail
+          };
+        }),
         suggestedFix: null
       };
     }

@@ -261,11 +261,11 @@ function openService(serviceId, options = {}) {
     </div>
     <h3 class="subhead">Diagnostics</h3>
     <div class="diagnostic-list">
-      ${service.diagnostics.map(([label, value]) => `
+      ${service.diagnostics.map(([label, value, diagnosticStatus]) => `
         <div class="diagnostic-step">
           <span>${escapeHtml(label)}</span>
           <strong>${escapeHtml(value)}</strong>
-          <b class="status-dot ${diagnosticState(value)}"></b>
+          <b class="status-dot ${diagnosticState(value, diagnosticStatus)}"></b>
         </div>
       `).join("")}
     </div>
@@ -336,13 +336,13 @@ async function loadServiceDiagnostics(service, button) {
   try {
     const payload = await api.getServiceDiagnostics(service.id);
     const checks = payload.checks || [];
-    service.diagnostics = checks.map((check) => [check.label, check.detail]);
+    service.diagnostics = checks.map((check) => [check.label, check.detail, check.state]);
     const list = $("#serviceDetailBody .diagnostic-list");
-    list.innerHTML = service.diagnostics.map(([label, value]) => `
+    list.innerHTML = service.diagnostics.map(([label, value, diagnosticStatus]) => `
       <div class="diagnostic-step">
         <span>${escapeHtml(label)}</span>
         <strong>${escapeHtml(value)}</strong>
-        <b class="status-dot ${diagnosticState(value)}"></b>
+        <b class="status-dot ${diagnosticState(value, diagnosticStatus)}"></b>
       </div>
     `).join("");
     list.classList.remove("pulse-once");
