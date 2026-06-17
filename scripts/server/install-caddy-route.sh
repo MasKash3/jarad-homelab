@@ -41,9 +41,22 @@ awk '
 
 cat "$tmp_clean" "$tmp_rendered" > "$tmp_new"
 
-sudo cp "$CADDYFILE" "$CADDYFILE.bak-$(date +%Y%m%d-%H%M%S)"
+if ! docker exec -i caddy caddy validate --config /dev/stdin < "$tmp_new"; then
+  rm -f "$tmp_rendered" "$tmp_clean" "$tmp_new"
+  echo "Generated Caddyfile failed validation; existing config was not changed." >&2
+  exit 1
+fi
+
+backup="$CADDYFILE.bak-$(date +%Y%m%d-%H%M%S)"
+sudo cp "$CADDYFILE" "$backup"
 sudo install -m 0644 "$tmp_new" "$CADDYFILE"
-docker restart caddy
+if ! docker restart caddy; then
+  sudo install -m 0644 "$backup" "$CADDYFILE"
+  docker restart caddy || true
+  rm -f "$tmp_rendered" "$tmp_clean" "$tmp_new"
+  echo "Caddy restart failed; restored previous Caddyfile from $backup." >&2
+  exit 1
+fi
 
 rm -f "$tmp_rendered" "$tmp_clean" "$tmp_new"
 
