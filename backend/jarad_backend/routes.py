@@ -8,9 +8,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .auth import require_token, verify_action_auth, verify_totp
-from .command import run_command
 from .config import LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
-from .docker import docker_logs
+from .docker import docker_action, docker_logs
 from .metrics import read_backup_state, read_cpu_pct, read_disk, read_raid_state, read_ram_pct, read_temp_c, read_uptime
 from .models import (
     ActionRequest,
@@ -212,7 +211,7 @@ def service_action(action_id: str, payload: ActionRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="Unsupported action")
     verify_action_auth(payload, action_id, service_id)
 
-    result = run_command(["docker", action, service["container"]], timeout=20)
+    result = docker_action(action, service["container"])
     if not result or result.returncode != 0:
         detail = result.stderr.strip() if result else "Docker command unavailable"
         raise HTTPException(status_code=500, detail=detail)
