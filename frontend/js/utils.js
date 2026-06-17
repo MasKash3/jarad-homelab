@@ -1,0 +1,85 @@
+export function resourceRow(label, value, max, unit, stateName) {
+  if (value === null || value === undefined || max === null || max === undefined || max === 0) {
+    return `
+      <div class="resource-row">
+        <div>
+          <span>${label}</span>
+          <strong>Unavailable</strong>
+        </div>
+        <div class="mini-bar muted-bar">
+          <span style="--value:0%"></span>
+        </div>
+      </div>
+    `;
+  }
+  const pct = Math.min(100, Math.round((value / max) * 100));
+  return `
+    <div class="resource-row">
+      <div>
+        <span>${label}</span>
+        <strong>${formatResource(value, max, unit)}</strong>
+      </div>
+      <div class="mini-bar" style="--bar-color:${colorForState(stateName)}">
+        <span style="--value:${pct}%"></span>
+      </div>
+    </div>
+  `;
+}
+
+export function formatResource(value, max, unit) {
+  if (unit === "%") return `${value}%`;
+  return `${value} ${unit} / ${max} ${unit}`;
+}
+
+export function diagnosticState(value) {
+  const text = String(value).toLowerCase();
+  if (text.includes("error") || text.includes("failed") || text.includes("none") === false && text.includes("warning")) return "warn";
+  if (text.includes("elevated") || text.includes("warning")) return "warn";
+  return "good";
+}
+
+export function formatUpdated(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  const seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+  if (seconds < 8) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  return `${minutes}m ago`;
+}
+
+export function stateClass(service) {
+  if (service.status !== "running" || service.health === "down") return "bad";
+  if (service.health === "degraded") return "warn";
+  return "good";
+}
+
+export function formatHealth(health) {
+  return {
+    healthy: "Healthy",
+    degraded: "Degraded",
+    down: "Down",
+    running: "Running"
+  }[health] || String(health);
+}
+
+export function labelForState(stateName) {
+  return stateName === "good" ? "OK" : stateName === "warn" ? "Monitor" : "High";
+}
+
+export function colorForState(stateName) {
+  return { good: "#138a53", warn: "#b7791f", bad: "#bd2b2b" }[stateName] || "#138a53";
+}
+
+export function emptyState(message) {
+  return `<div class="audit-item"><p>${message}</p></div>`;
+}
+export const $ = (selector) => document.querySelector(selector);
+export const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+export function readJsonStorage(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || fallback;
+  } catch {
+    return fallback;
+  }
+}

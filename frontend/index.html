@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#050b10">
+    <title>Jarad</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <svg class="icon-sprite" aria-hidden="true">
+      <symbol id="icon-activity" viewBox="0 0 24 24">
+        <path d="M22 12h-4l-3 8-6-16-3 8H2"></path>
+      </symbol>
+      <symbol id="icon-server" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="8" rx="2"></rect>
+        <rect x="3" y="14" width="18" height="6" rx="2"></rect>
+        <path d="M7 8h.01M7 17h.01M11 8h6M11 17h6"></path>
+      </symbol>
+      <symbol id="icon-log" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <path d="M14 2v6h6M8 13h8M8 17h8M8 9h2"></path>
+      </symbol>
+      <symbol id="icon-bell" viewBox="0 0 24 24">
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+      </symbol>
+      <symbol id="icon-shield" viewBox="0 0 24 24">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path>
+      </symbol>
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </symbol>
+      <symbol id="icon-refresh" viewBox="0 0 24 24">
+        <path d="M21 12a9 9 0 0 1-15.5 6.2"></path>
+        <path d="M3 12a9 9 0 0 1 15.5-6.2"></path>
+        <path d="M18 2v4h-4M6 22v-4h4"></path>
+      </symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24">
+        <path d="m8 5 11 7-11 7z"></path>
+      </symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24">
+        <path d="M7 5h4v14H7z"></path>
+        <path d="M13 5h4v14h-4z"></path>
+      </symbol>
+      <symbol id="icon-power" viewBox="0 0 24 24">
+        <path d="M12 2v10"></path>
+        <path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path>
+      </symbol>
+      <symbol id="icon-link" viewBox="0 0 24 24">
+        <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4.93"></path>
+        <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 19.07"></path>
+      </symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24">
+        <path d="M18 6 6 18M6 6l12 12"></path>
+      </symbol>
+    </svg>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Private network</p>
+          <h1>Jarad</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="refreshButton" type="button" aria-label="Refresh data" title="Refresh data">
+            <svg><use href="#icon-refresh"></use></svg>
+          </button>
+          <button class="icon-button" id="settingsButton" type="button" aria-label="Backend settings" title="Backend settings">
+            <svg><use href="#icon-link"></use></svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="screen is-active" id="screen-dashboard" aria-labelledby="dashboardTitle">
+          <div class="status-strip">
+            <div>
+              <span class="status-dot good"></span>
+              <span id="overallStatus">Operational</span>
+            </div>
+            <div class="status-meta">
+              <span id="connectionState" class="connection-chip muted">Mock mode</span>
+              <span id="lastUpdated">Updated just now</span>
+            </div>
+          </div>
+
+          <div class="hero-status">
+            <div>
+              <p class="eyebrow">Server uptime</p>
+              <h2 id="dashboardTitle">18 days, 7 hours</h2>
+            </div>
+            <div class="score-ring" aria-label="System health score">
+              <span id="healthScore">96</span>
+            </div>
+          </div>
+
+          <div class="metric-grid" id="metricGrid"></div>
+
+          <section class="panel">
+            <div class="section-head">
+              <h3>Storage</h3>
+              <span id="raidState" class="pill good">RAID clean</span>
+            </div>
+            <div class="storage-bar" aria-label="Data drive usage">
+              <span id="storageUsedBar"></span>
+            </div>
+            <div class="split-row">
+              <span id="storageLabel">1.28 TB used of 1.82 TB</span>
+              <span id="cloudBackupLabel">Cloud backup 342 GB</span>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <h3>Backup Center</h3>
+              <span id="backupState" class="pill good">Healthy</span>
+            </div>
+            <div class="backup-timeline">
+              <div>
+                <span>Quick</span>
+                <strong id="quickBackup">Today 18:00</strong>
+              </div>
+              <div>
+                <span>Full</span>
+                <strong id="fullBackup">Today 06:00</strong>
+              </div>
+              <div>
+                <span>Next</span>
+                <strong id="nextBackup">Tonight 00:00</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel launcher-panel">
+            <div class="section-head">
+              <h3>Apps</h3>
+              <button class="text-button" type="button" data-nav="services">Manage</button>
+            </div>
+            <div class="launcher-grid" id="launcherGrid"></div>
+          </section>
+        </section>
+
+        <section class="screen" id="screen-services" aria-labelledby="servicesTitle">
+          <div class="section-head tight">
+            <div>
+              <p class="eyebrow">Containers</p>
+              <h2 id="servicesTitle">Services</h2>
+            </div>
+            <div class="segmented" role="tablist" aria-label="Service filter">
+              <button class="is-selected" type="button" data-service-filter="all">All</button>
+              <button type="button" data-service-filter="degraded">Degraded</button>
+              <button type="button" data-service-filter="down">Down</button>
+            </div>
+          </div>
+          <div class="service-list" id="serviceList"></div>
+        </section>
+
+        <section class="screen" id="screen-logs" aria-labelledby="logsTitle">
+          <div class="section-head tight">
+            <div>
+              <p class="eyebrow">Recent events</p>
+              <h2 id="logsTitle">Logs</h2>
+            </div>
+            <button class="icon-button" id="liveTailButton" type="button" aria-label="Toggle live tail" title="Toggle live tail">
+              <svg><use href="#icon-play"></use></svg>
+            </button>
+          </div>
+          <label class="search-box">
+            <svg><use href="#icon-search"></use></svg>
+            <input id="logSearch" type="search" placeholder="Search logs">
+          </label>
+          <div class="chip-row" id="logFilters">
+            <button class="is-selected" type="button" data-log-filter="all">All</button>
+            <button type="button" data-log-filter="error">Errors</button>
+            <button type="button" data-log-filter="backup">Backup</button>
+            <button type="button" data-log-filter="dns">DNS</button>
+          </div>
+          <div class="log-list" id="logList" aria-live="polite"></div>
+        </section>
+
+        <section class="screen" id="screen-alerts" aria-labelledby="alertsTitle">
+          <div class="section-head tight">
+            <div>
+              <p class="eyebrow">Notifications</p>
+              <h2 id="alertsTitle">Alerts</h2>
+            </div>
+            <span class="pill warn" id="activeAlertCount">2 active</span>
+          </div>
+          <div class="alert-list" id="alertList"></div>
+          <section class="panel">
+            <div class="section-head">
+              <h3>Network Center</h3>
+              <span class="pill good" id="dnsState">DNS OK</span>
+            </div>
+            <div class="network-grid" id="networkGrid"></div>
+          </section>
+        </section>
+
+        <section class="screen" id="screen-admin" aria-labelledby="adminTitle">
+          <div class="section-head tight">
+            <div>
+              <p class="eyebrow">App settings</p>
+              <h2 id="adminTitle">Config</h2>
+            </div>
+            <span class="pill info" id="backendState">Mock data</span>
+          </div>
+
+          <section class="panel">
+            <div class="section-head">
+              <h3>Action Authentication</h3>
+              <span class="pill good" id="authMethodState">Fingerprint</span>
+            </div>
+            <div class="segmented wide" role="tablist" aria-label="Preferred authentication method">
+              <button class="is-selected" type="button" data-auth-method="fingerprint">Fingerprint</button>
+              <button type="button" data-auth-method="totp">TOTP</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <h3>Configuration Areas</h3>
+              <span class="pill muted">Local</span>
+            </div>
+            <div class="config-list" id="configList"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <h3>Audit Log</h3>
+              <button class="text-button" id="clearAuditButton" type="button">Clear local</button>
+            </div>
+            <div class="audit-list" id="auditList"></div>
+          </section>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Main navigation">
+        <button class="is-active" type="button" data-nav="dashboard" aria-label="Dashboard">
+          <svg><use href="#icon-activity"></use></svg>
+          <span>Home</span>
+        </button>
+        <button type="button" data-nav="services" aria-label="Services">
+          <svg><use href="#icon-server"></use></svg>
+          <span>Services</span>
+        </button>
+        <button type="button" data-nav="logs" aria-label="Logs">
+          <svg><use href="#icon-log"></use></svg>
+          <span>Logs</span>
+        </button>
+        <button type="button" data-nav="alerts" aria-label="Alerts">
+          <svg><use href="#icon-bell"></use></svg>
+          <span>Alerts</span>
+        </button>
+        <button type="button" data-nav="admin" aria-label="Admin">
+          <svg><use href="#icon-shield"></use></svg>
+          <span>Config</span>
+        </button>
+      </nav>
+    </div>
+
+    <dialog class="sheet" id="serviceSheet">
+      <div class="sheet-head">
+        <div>
+          <p class="eyebrow" id="sheetServiceType">Container</p>
+          <h2 id="sheetServiceName">Service</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-sheet aria-label="Close service details" title="Close">
+          <svg><use href="#icon-close"></use></svg>
+        </button>
+      </div>
+      <div id="serviceDetailBody"></div>
+    </dialog>
+
+    <dialog class="sheet auth-sheet" id="authSheet">
+      <div class="sheet-head">
+        <div>
+          <p class="eyebrow">Protected action</p>
+          <h2 id="authTitle">Authorize</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-auth aria-label="Close authorization" title="Close">
+          <svg><use href="#icon-close"></use></svg>
+        </button>
+      </div>
+      <div class="auth-body">
+        <div class="auth-symbol">
+          <svg><use href="#icon-shield"></use></svg>
+        </div>
+        <p id="authCopy">Protected action requires authentication.</p>
+        <p class="auth-error" id="authError" role="alert" aria-live="polite" hidden></p>
+        <button class="primary-button" id="fingerprintAuthButton" type="button">Use Fingerprint</button>
+        <div id="totpAuthBlock" hidden>
+          <label class="confirm-code">
+            <span>TOTP code</span>
+            <input id="authTotpInput" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+          </label>
+          <button class="primary-button" id="totpAuthButton" type="button">Verify</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="sheet" id="settingsSheet">
+      <div class="sheet-head">
+        <div>
+          <p class="eyebrow">Connection</p>
+          <h2>Backend</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-settings aria-label="Close settings" title="Close">
+          <svg><use href="#icon-close"></use></svg>
+        </button>
+      </div>
+      <form class="settings-form" id="settingsForm">
+        <label>
+          <span>FastAPI base URL</span>
+          <input id="apiBaseInput" type="url" placeholder="Leave blank on the Tailscale Caddy URL">
+        </label>
+        <label>
+          <span>Access token</span>
+          <input id="apiTokenInput" type="password" placeholder="Stored on this device">
+        </label>
+        <button class="primary-button" type="submit">Save</button>
+      </form>
+    </dialog>
+
+    <script>
+      window.addEventListener("error", (event) => {
+        document.documentElement.dataset.appError = event.message;
+      });
+      window.addEventListener("unhandledrejection", (event) => {
+        document.documentElement.dataset.appError = event.reason?.message || "Unhandled startup error";
+      });
+    </script>
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

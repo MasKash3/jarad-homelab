@@ -1,0 +1,19 @@
+[Unit]
+Description=Jarad Mobile Frontend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__REMOTE_ROOT__/frontend
+Environment=JARAD_FRONTEND_HOST=127.0.0.1
+Environment=JARAD_FRONTEND_PORT=5178
+EnvironmentFile=-__REMOTE_ROOT__/backend/.env
+ExecStart=/usr/bin/python3 -m http.server ${JARAD_FRONTEND_PORT} --bind ${JARAD_FRONTEND_HOST}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

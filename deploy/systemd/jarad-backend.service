@@ -1,0 +1,19 @@
+[Unit]
+Description=Jarad Backend
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__REMOTE_ROOT__/backend
+Environment=JARAD_BACKEND_HOST=127.0.0.1
+Environment=JARAD_BACKEND_PORT=8443
+EnvironmentFile=-__REMOTE_ROOT__/backend/.env
+ExecStart=__REMOTE_ROOT__/backend/.venv/bin/uvicorn jarad_backend.main:app --host ${JARAD_BACKEND_HOST} --port ${JARAD_BACKEND_PORT}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

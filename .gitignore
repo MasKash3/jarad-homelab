@@ -1,0 +1,24 @@
+# Local preview logs
+server.out.log
+server.err.log
+backend.out.log
+backend.err.log
+backend/*.log
+
+# Local dependency/build output if the app grows later
+node_modules/
+dist/
+build/
+__pycache__/
+*.py[cod]
+.venv/
+
+# Local secrets and editor state
+.env
+.env.*
+!.env.example
+!backend/.env.example
+deploy/local.env
+deploy/local.ps1
+.vscode/
+.idea/

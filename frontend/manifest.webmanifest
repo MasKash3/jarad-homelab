@@ -1,0 +1,24 @@
+{
+  "name": "Jarad Mobile",
+  "short_name": "Jarad",
+  "description": "Private mobile operations console for the Jarad home server.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#050b10",
+  "theme_color": "#050b10",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

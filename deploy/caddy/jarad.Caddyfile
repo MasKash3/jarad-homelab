@@ -1,0 +1,8 @@
+# jarad:start
+__TAILSCALE_DOMAIN__:__APP_PORT__ {
+    tls /certs/__TAILSCALE_DOMAIN__.crt /certs/__TAILSCALE_DOMAIN__.key
+
+    reverse_proxy /api/* localhost:8443
+    reverse_proxy localhost:5178
+}
+# jarad:end

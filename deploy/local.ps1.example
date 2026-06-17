@@ -1,0 +1,9 @@
+# Optional local deploy values for your machine.
+# Copy to deploy/local.ps1 and keep the copy out of Git.
+
+$JaradDeployHost = "<server-ip-or-host>"
+$JaradDeployUser = "<ssh-user>"
+$JaradRemoteRoot = "~/mobile"
+$JaradCaddyDomain = "<device.tailnet.ts.net>"
+$JaradCaddyAppPort = "8444"
+$JaradCaddyfile = "~/caddy/Caddyfile"
