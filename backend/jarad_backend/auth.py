@@ -25,10 +25,8 @@ def verify_action_auth(payload: ActionRequest) -> None:
             raise HTTPException(status_code=401, detail="Invalid TOTP code")
         return
     if method == "fingerprint":
-        if not payload.fingerprintVerified:
-            raise HTTPException(status_code=401, detail="Fingerprint verification required")
-        return
-    raise HTTPException(status_code=400, detail="Choose fingerprint or TOTP before running this action")
+        raise HTTPException(status_code=400, detail="Fingerprint actions need server-side WebAuthn. Use TOTP.")
+    raise HTTPException(status_code=400, detail="Choose TOTP before running this action")
 
 
 def verify_totp(code: str) -> bool:

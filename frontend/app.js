@@ -509,7 +509,7 @@ function readAudit() {
 }
 
 function getAuthMethod() {
-  return localStorage.getItem(storageKeys.authMethod) || "fingerprint";
+  return "totp";
 }
 
 function authMethodLabel() {
