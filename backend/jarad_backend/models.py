@@ -10,7 +10,30 @@ class ActionRequest(BaseModel):
     authMethod: str | None = None
     totpCode: str | None = None
     fingerprintVerified: bool = False
+    actionAuthToken: str | None = None
 
 
 class TotpCheckRequest(BaseModel):
     code: str
+
+
+class WebAuthnRegisterOptionsRequest(BaseModel):
+    deviceLabel: str | None = None
+
+
+class WebAuthnRegisterVerifyRequest(BaseModel):
+    challengeId: str
+    deviceLabel: str | None = None
+    credential: dict
+
+
+class WebAuthnAuthenticateOptionsRequest(BaseModel):
+    actionId: str | None = None
+    serviceId: str | None = None
+
+
+class WebAuthnAuthenticateVerifyRequest(BaseModel):
+    challengeId: str
+    actionId: str | None = None
+    serviceId: str | None = None
+    credential: dict

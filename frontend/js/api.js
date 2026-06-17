@@ -25,6 +25,33 @@ function connectionLabel(baseUrl) {
 }
 
 export function createApi({ addAudit, getState, setConnectionState, settings }) {
+  async function request(path, options = {}) {
+    const currentSettings = effectiveSettings(settings);
+    if (!currentSettings.baseUrl) {
+      throw new Error("Backend is not configured");
+    }
+
+    const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}${path}`, {
+      ...options,
+      headers: {
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(currentSettings.token ? { Authorization: `Bearer ${currentSettings.token}` } : {}),
+        ...(options.headers || {})
+      }
+    });
+    if (!response.ok) {
+      let detail = `Request failed with ${response.status}`;
+      try {
+        const body = await response.json();
+        detail = body.detail || detail;
+      } catch {
+        // Keep the status fallback when the backend returns a non-JSON error.
+      }
+      throw new Error(detail);
+    }
+    return response.json();
+  }
+
   return {
   async getState() {
     const currentSettings = effectiveSettings(settings);
@@ -56,37 +83,58 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
     }
   },
   async executeAction(action, auth = {}) {
-    const currentSettings = effectiveSettings(settings);
-    if (!currentSettings.baseUrl) {
-      throw new Error("Backend is not configured");
-    }
-
-    const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}/api/admin/actions/${action.id}`, {
+    const payload = await request(`/api/admin/actions/${action.id}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(currentSettings.token ? { Authorization: `Bearer ${currentSettings.token}` } : {})
-      },
       body: JSON.stringify({
         source: "mobile-pwa",
         serviceId: action.serviceId,
         authMethod: auth.method,
         totpCode: auth.totpCode,
-        fingerprintVerified: auth.method === "fingerprint" && auth.verified === true
+        actionAuthToken: auth.actionAuthToken
       })
     });
-    if (!response.ok) {
-      let detail = `Action failed with ${response.status}`;
-      try {
-        const body = await response.json();
-        detail = body.detail || detail;
-      } catch {
-        // Keep the status fallback when the backend returns a non-JSON error.
-      }
-      throw new Error(detail);
-    }
     addAudit(action.title, action.target, "success", "Backend accepted action");
-    return response.json();
+    return payload;
+  },
+  async listPasskeys() {
+    return request("/api/auth/webauthn/credentials");
+  },
+  async deletePasskey(credentialId) {
+    return request(`/api/auth/webauthn/credentials/${encodeURIComponent(credentialId)}`, {
+      method: "DELETE"
+    });
+  },
+  async getPasskeyRegistrationOptions(deviceLabel) {
+    return request("/api/auth/webauthn/register/options", {
+      method: "POST",
+      body: JSON.stringify({ deviceLabel })
+    });
+  },
+  async verifyPasskeyRegistration(challengeId, credential, deviceLabel) {
+    return request("/api/auth/webauthn/register/verify", {
+      method: "POST",
+      body: JSON.stringify({ challengeId, credential, deviceLabel })
+    });
+  },
+  async getPasskeyAuthenticationOptions(action) {
+    return request("/api/auth/webauthn/authenticate/options", {
+      method: "POST",
+      body: JSON.stringify({
+        actionId: action?.id,
+        serviceId: action?.serviceId
+      })
+    });
+  },
+  async verifyPasskeyAuthentication(challengeId, credential, action) {
+    return request("/api/auth/webauthn/authenticate/verify", {
+      method: "POST",
+      body: JSON.stringify({
+        challengeId,
+        credential,
+        actionId: action?.id,
+        serviceId: action?.serviceId
+      })
+    });
   },
   async getServiceLogs(serviceId, limit = 100) {
     const currentSettings = effectiveSettings(settings);

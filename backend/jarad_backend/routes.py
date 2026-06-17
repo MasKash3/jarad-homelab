@@ -12,8 +12,23 @@ from .command import run_command
 from .config import LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
 from .docker import docker_logs
 from .metrics import read_backup_state, read_cpu_pct, read_disk, read_raid_state, read_ram_pct, read_temp_c, read_uptime
-from .models import ActionRequest, TotpCheckRequest
+from .models import (
+    ActionRequest,
+    TotpCheckRequest,
+    WebAuthnAuthenticateOptionsRequest,
+    WebAuthnAuthenticateVerifyRequest,
+    WebAuthnRegisterOptionsRequest,
+    WebAuthnRegisterVerifyRequest,
+)
 from .services import alerts_for, build_services, network_state, recent_logs
+from .webauthn_auth import (
+    begin_authentication,
+    begin_registration,
+    finish_authentication,
+    finish_registration,
+    list_registered_credentials,
+    remove_registered_credential,
+)
 
 router = APIRouter()
 protected = [Depends(require_token)]
@@ -45,6 +60,42 @@ def check_totp(payload: TotpCheckRequest) -> dict[str, Any]:
         "serverTime": datetime.now(timezone.utc).isoformat(),
         "codeWindowSeconds": 30,
     }
+
+
+@router.post("/api/auth/webauthn/register/options", dependencies=protected)
+def webauthn_register_options(payload: WebAuthnRegisterOptionsRequest) -> dict[str, Any]:
+    return begin_registration(payload.deviceLabel)
+
+
+@router.post("/api/auth/webauthn/register/verify", dependencies=protected)
+def webauthn_register_verify(payload: WebAuthnRegisterVerifyRequest) -> dict[str, Any]:
+    return finish_registration(payload.challengeId, payload.credential, payload.deviceLabel)
+
+
+@router.get("/api/auth/webauthn/credentials", dependencies=protected)
+def webauthn_credentials() -> dict[str, Any]:
+    return {"credentials": list_registered_credentials()}
+
+
+@router.delete("/api/auth/webauthn/credentials/{credential_id}", dependencies=protected)
+def webauthn_delete_credential(credential_id: str) -> dict[str, str]:
+    remove_registered_credential(credential_id)
+    return {"status": "deleted"}
+
+
+@router.post("/api/auth/webauthn/authenticate/options", dependencies=protected)
+def webauthn_authenticate_options(payload: WebAuthnAuthenticateOptionsRequest) -> dict[str, Any]:
+    return begin_authentication(payload.actionId, payload.serviceId)
+
+
+@router.post("/api/auth/webauthn/authenticate/verify", dependencies=protected)
+def webauthn_authenticate_verify(payload: WebAuthnAuthenticateVerifyRequest) -> dict[str, Any]:
+    return finish_authentication(
+        challenge_id=payload.challengeId,
+        credential=payload.credential,
+        action_id=payload.actionId,
+        service_id=payload.serviceId,
+    )
 
 
 @router.get("/api/mobile/state", dependencies=protected)
@@ -159,7 +210,7 @@ def service_action(action_id: str, payload: ActionRequest) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="Unknown service")
     if action not in {"start", "restart", "stop"}:
         raise HTTPException(status_code=400, detail="Unsupported action")
-    verify_action_auth(payload)
+    verify_action_auth(payload, action_id, service_id)
 
     result = run_command(["docker", action, service["container"]], timeout=20)
     if not result or result.returncode != 0:

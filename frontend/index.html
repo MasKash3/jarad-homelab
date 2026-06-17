@@ -214,10 +214,18 @@
               <span class="pill good" id="authMethodState">Fingerprint</span>
             </div>
             <div class="segmented wide" role="tablist" aria-label="Preferred authentication method">
-              <button type="button" data-auth-method="fingerprint" data-auth-unavailable="true" title="Server-side WebAuthn is not enabled yet">Fingerprint</button>
+              <button type="button" data-auth-method="fingerprint">Passkey</button>
               <button class="is-selected" type="button" data-auth-method="totp">TOTP</button>
             </div>
             <p class="config-help" id="authMethodHelp">TOTP is active for protected actions.</p>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <h3>Passkeys</h3>
+              <button class="text-button" id="registerPasskeyButton" type="button">Register this device</button>
+            </div>
+            <div class="config-list" id="passkeyList"></div>
           </section>
 
           <section class="panel">
@@ -291,7 +299,7 @@
         </div>
         <p id="authCopy">Protected action requires authentication.</p>
         <p class="auth-error" id="authError" role="alert" aria-live="polite" hidden></p>
-        <button class="primary-button" id="fingerprintAuthButton" type="button">Use Fingerprint</button>
+        <button class="primary-button" id="fingerprintAuthButton" type="button">Use Passkey</button>
         <div id="totpAuthBlock" hidden>
           <label class="confirm-code">
             <span>TOTP code</span>

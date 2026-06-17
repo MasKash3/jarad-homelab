@@ -1,7 +1,7 @@
 import { configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js';
 import { createNoDataState } from './js/empty-state.js';
 import { createApi } from './js/api.js';
-import { verifyFingerprint } from './js/auth.js';
+import { registerPasskey, verifyPasskeyForAction } from './js/auth.js';
 import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js';
 
 let serviceFilter = "all";
@@ -11,6 +11,7 @@ let pendingAction = null;
 let pendingService = null;
 let activeServiceId = null;
 let pendingAuth = null;
+let passkeyCredentials = [];
 let state = createNoDataState();
 let connectionState = {
   mode: "disconnected",
@@ -187,8 +188,19 @@ function renderAdmin() {
 function renderConfig() {
   const settings = readSettings();
   $("#authMethodState").textContent = authMethodLabel();
-  $("#authMethodHelp").textContent = "TOTP is active for protected actions.";
+  $("#authMethodHelp").textContent = getAuthMethod() === "fingerprint"
+    ? "Passkey is active for protected actions. TOTP remains available as a fallback."
+    : "TOTP is active for protected actions.";
   $("#backendState").textContent = settings.baseUrl || hasAutoBackend() ? "Configured" : "Not connected";
+  $("#passkeyList").innerHTML = passkeyCredentials.map((credential) => `
+    <article class="config-card">
+      <div>
+        <strong>${escapeHtml(credential.deviceLabel || "Registered passkey")}</strong>
+        <p>${escapeHtml(credential.lastUsedAt ? `Last used ${formatUpdated(credential.lastUsedAt)}` : `Created ${formatUpdated(credential.createdAt)}`)}</p>
+      </div>
+      <button class="text-button" type="button" data-delete-passkey="${escapeAttr(credential.credentialId)}">Remove</button>
+    </article>
+  `).join("") || emptyState("No passkeys registered on this backend yet.");
   $("#configList").innerHTML = configActions.map((item) => `
     <article class="config-card">
       <div>
@@ -201,6 +213,9 @@ function renderConfig() {
 
   $$("[data-auth-method]").forEach((button) => {
     button.classList.toggle("is-selected", button.dataset.authMethod === getAuthMethod());
+  });
+  $$("[data-delete-passkey]").forEach((button) => {
+    button.addEventListener("click", () => deletePasskey(button.dataset.deletePasskey));
   });
   renderAudit();
 }
@@ -415,9 +430,9 @@ async function completeFingerprintAuth() {
   button.textContent = "Waiting...";
 
   try {
-    await verifyFingerprint();
-    pendingAuth = { method: "fingerprint", verified: true };
-    addAudit("Authentication success", pendingAction?.target || "service action", "success", "Fingerprint");
+    const result = await verifyPasskeyForAction(api, pendingAction);
+    pendingAuth = { method: "fingerprint", actionAuthToken: result.actionAuthToken };
+    addAudit("Authentication success", pendingAction?.target || "service action", "success", "Passkey");
     $("#authSheet").close();
     executePendingAction();
   } catch (error) {
@@ -522,11 +537,50 @@ function readAudit() {
 }
 
 function getAuthMethod() {
-  return "totp";
+  return localStorage.getItem(storageKeys.authMethod) || "totp";
 }
 
 function authMethodLabel() {
-  return getAuthMethod() === "fingerprint" ? "Fingerprint" : "TOTP";
+  return getAuthMethod() === "fingerprint" ? "Passkey" : "TOTP";
+}
+
+async function refreshPasskeys() {
+  try {
+    const payload = await api.listPasskeys();
+    passkeyCredentials = payload.credentials || [];
+  } catch {
+    passkeyCredentials = [];
+  }
+  renderConfig();
+}
+
+async function registerThisDevicePasskey() {
+  const button = $("#registerPasskeyButton");
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Registering...";
+  try {
+    const result = await registerPasskey(api);
+    addAudit("Registered passkey", "config", "success", result.deviceLabel || "This device");
+    await refreshPasskeys();
+  } catch (error) {
+    addAudit("Passkey registration failed", "config", "failure", error.message);
+    $("#authMethodHelp").textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
+async function deletePasskey(credentialId) {
+  try {
+    await api.deletePasskey(credentialId);
+    addAudit("Removed passkey", "config", "success");
+    await refreshPasskeys();
+  } catch (error) {
+    addAudit("Remove passkey failed", "config", "failure", error.message);
+    $("#authMethodHelp").textContent = error.message;
+  }
 }
 
 function bindEvents() {
@@ -579,17 +633,12 @@ function bindEvents() {
 
   $$("[data-auth-method]").forEach((button) => {
     button.addEventListener("click", () => {
-      if (button.dataset.authUnavailable === "true") {
-        $("#authMethodHelp").textContent = "Fingerprint needs server-side WebAuthn before it can protect real Docker actions. Use TOTP for now.";
-        addAudit("Fingerprint unavailable", "config", "warn", "Server-side WebAuthn is not enabled");
-        renderAudit();
-        return;
-      }
       localStorage.setItem(storageKeys.authMethod, button.dataset.authMethod);
       addAudit("Changed auth method", "config", "success", authMethodLabel());
       renderConfig();
     });
   });
+  $("#registerPasskeyButton").addEventListener("click", registerThisDevicePasskey);
 
   $("#clearAuditButton").addEventListener("click", () => {
     localStorage.removeItem(storageKeys.audit);
@@ -615,3 +664,4 @@ if ("serviceWorker" in navigator) {
 migrateLegacyStorage();
 bindEvents();
 refreshState();
+refreshPasskeys();

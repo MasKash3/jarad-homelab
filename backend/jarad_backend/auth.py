@@ -10,6 +10,7 @@ from fastapi import Header, HTTPException
 
 from .config import APP_TOKEN, TOTP_SECRET
 from .models import ActionRequest
+from .webauthn_auth import consume_action_token
 
 
 def require_token(authorization: str | None = Header(default=None)) -> None:
@@ -18,14 +19,18 @@ def require_token(authorization: str | None = Header(default=None)) -> None:
         raise HTTPException(status_code=401, detail="Invalid or missing bearer token")
 
 
-def verify_action_auth(payload: ActionRequest) -> None:
+def verify_action_auth(payload: ActionRequest, action_id: str, service_id: str) -> None:
     method = (payload.authMethod or "").lower()
     if method == "totp":
         if not verify_totp(payload.totpCode or ""):
             raise HTTPException(status_code=401, detail="Invalid TOTP code")
         return
     if method == "fingerprint":
-        raise HTTPException(status_code=400, detail="Fingerprint actions need server-side WebAuthn. Use TOTP.")
+        if not payload.actionAuthToken:
+            raise HTTPException(status_code=401, detail="Missing WebAuthn action authorization")
+        if not consume_action_token(payload.actionAuthToken, action_id, service_id):
+            raise HTTPException(status_code=401, detail="Invalid or expired WebAuthn action authorization")
+        return
     raise HTTPException(status_code=400, detail="Choose TOTP before running this action")
 
 
