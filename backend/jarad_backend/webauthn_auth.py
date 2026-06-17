@@ -14,10 +14,8 @@ from webauthn import (
     verify_registration_response,
 )
 from webauthn.helpers.structs import (
-    AuthenticationCredential,
     AuthenticatorSelectionCriteria,
     PublicKeyCredentialDescriptor,
-    RegistrationCredential,
     UserVerificationRequirement,
 )
 
@@ -40,14 +38,6 @@ def b64url_encode(value: bytes) -> str:
 def b64url_decode(value: str) -> bytes:
     padded = value + ("=" * ((4 - len(value) % 4) % 4))
     return base64.urlsafe_b64decode(padded.encode("ascii"))
-
-
-def credential_from_json(model: type, value: dict[str, Any]) -> Any:
-    if hasattr(model, "model_validate"):
-        return model.model_validate(value)
-    if hasattr(model, "parse_obj"):
-        return model.parse_obj(value)
-    return model.parse_raw(json.dumps(value))
 
 
 def options_payload(options: Any) -> dict[str, Any]:
@@ -93,7 +83,7 @@ def finish_registration(challenge_id: str, credential: dict[str, Any], device_la
 
     try:
         verification = verify_registration_response(
-            credential=credential_from_json(RegistrationCredential, credential),
+            credential=credential,
             expected_challenge=challenge["challenge"],
             expected_origin=WEBAUTHN_ORIGIN,
             expected_rp_id=WEBAUTHN_RP_ID,
@@ -167,7 +157,7 @@ def finish_authentication(
 
     try:
         verification = verify_authentication_response(
-            credential=credential_from_json(AuthenticationCredential, credential),
+            credential=credential,
             expected_challenge=challenge["challenge"],
             expected_origin=WEBAUTHN_ORIGIN,
             expected_rp_id=WEBAUTHN_RP_ID,
