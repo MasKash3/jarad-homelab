@@ -78,22 +78,22 @@
         <section class="screen is-active" id="screen-dashboard" aria-labelledby="dashboardTitle">
           <div class="status-strip">
             <div>
-              <span class="status-dot good"></span>
-              <span id="overallStatus">Operational</span>
+              <span class="status-dot warn"></span>
+              <span id="overallStatus">No connection</span>
             </div>
             <div class="status-meta">
               <span id="connectionState" class="connection-chip disconnected">No backend</span>
-              <span id="lastUpdated">Updated just now</span>
+              <span id="lastUpdated">No live update</span>
             </div>
           </div>
 
           <div class="hero-status">
             <div>
-              <p class="eyebrow">Server uptime</p>
-              <h2 id="dashboardTitle">18 days, 7 hours</h2>
+              <p class="eyebrow" id="dashboardKicker">Connection</p>
+              <h2 id="dashboardTitle">No live data</h2>
             </div>
             <div class="score-ring" aria-label="System health score">
-              <span id="healthScore">96</span>
+              <span id="healthScore">--</span>
             </div>
           </div>
 
@@ -102,34 +102,34 @@
           <section class="panel">
             <div class="section-head">
               <h3>Storage</h3>
-              <span id="raidState" class="pill good">RAID clean</span>
+              <span id="raidState" class="pill warn">Unavailable</span>
             </div>
             <div class="storage-bar" aria-label="Data drive usage">
               <span id="storageUsedBar"></span>
             </div>
             <div class="split-row">
-              <span id="storageLabel">1.28 TB used of 1.82 TB</span>
-              <span id="cloudBackupLabel">Cloud backup 342 GB</span>
+              <span id="storageLabel">No live storage data</span>
+              <span id="cloudBackupLabel">Backup status unavailable</span>
             </div>
           </section>
 
           <section class="panel">
             <div class="section-head">
               <h3>Backup Center</h3>
-              <span id="backupState" class="pill good">Healthy</span>
+              <span id="backupState" class="pill warn">Unavailable</span>
             </div>
             <div class="backup-timeline">
               <div>
                 <span>Quick</span>
-                <strong id="quickBackup">Today 18:00</strong>
+                <strong id="quickBackup">No data</strong>
               </div>
               <div>
                 <span>Full</span>
-                <strong id="fullBackup">Today 06:00</strong>
+                <strong id="fullBackup">No data</strong>
               </div>
               <div>
                 <span>Next</span>
-                <strong id="nextBackup">Tonight 00:00</strong>
+                <strong id="nextBackup">No data</strong>
               </div>
             </div>
           </section>

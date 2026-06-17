@@ -71,6 +71,7 @@ function renderDashboard() {
   $("#connectionState").textContent = connectionState.label;
   $("#connectionState").className = `connection-chip ${connectionState.mode}`;
   $("#lastUpdated").textContent = state.isEmpty ? "No live update" : `Updated ${formatUpdated(state.updatedAt)}`;
+  $("#dashboardKicker").textContent = state.isEmpty ? "Connection" : "Server uptime";
   $("#dashboardTitle").textContent = state.server.uptime;
   $("#healthScore").textContent = state.server.healthScore;
   $("#metricGrid").innerHTML = state.metrics.map((metric) => `
@@ -86,6 +87,7 @@ function renderDashboard() {
     </article>
   `).join("") || noDataPanel("No Metrics", state.emptyReason || "Live server metrics are unavailable.");
   $("#raidState").textContent = state.storage.raid;
+  $("#raidState").className = `pill ${state.isEmpty ? "warn" : "good"}`;
   $("#storageUsedBar").style.setProperty("--value", `${state.storage.usedPct}%`);
   $("#storageUsedBar").style.setProperty("--bar-color", colorForState(state.storage.usedPct > 80 ? "bad" : state.storage.usedPct > 65 ? "warn" : "good"));
   $("#storageLabel").textContent = state.storage.label;
