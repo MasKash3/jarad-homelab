@@ -5,7 +5,7 @@ import socket
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .auth import require_token, verify_action_auth, verify_totp
 from .config import LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
@@ -20,6 +20,7 @@ from .models import (
     WebAuthnRegisterOptionsRequest,
     WebAuthnRegisterVerifyRequest,
 )
+from .rate_limit import enforce_rate_limit
 from .services import alerts_for, build_services, network_state, recent_logs
 from .webauthn_auth import (
     begin_authentication,
@@ -58,7 +59,8 @@ def health() -> dict[str, str]:
 
 
 @router.post("/api/auth/totp/check", dependencies=protected)
-def check_totp(payload: TotpCheckRequest) -> dict[str, Any]:
+def check_totp(payload: TotpCheckRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="totp-check", limit=6, window_seconds=60)
     configured = bool(TOTP_SECRET)
     valid = verify_totp(payload.code) if configured else False
     return {
@@ -70,13 +72,15 @@ def check_totp(payload: TotpCheckRequest) -> dict[str, Any]:
 
 
 @router.post("/api/auth/webauthn/register/options", dependencies=protected)
-def webauthn_register_options(payload: WebAuthnRegisterOptionsRequest) -> dict[str, Any]:
+def webauthn_register_options(payload: WebAuthnRegisterOptionsRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="webauthn-register", limit=6, window_seconds=300)
     require_credential_management_auth(payload.totpCode)
     return begin_registration(payload.deviceLabel)
 
 
 @router.post("/api/auth/webauthn/register/verify", dependencies=protected)
-def webauthn_register_verify(payload: WebAuthnRegisterVerifyRequest) -> dict[str, Any]:
+def webauthn_register_verify(payload: WebAuthnRegisterVerifyRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="webauthn-register", limit=6, window_seconds=300)
     require_credential_management_auth(payload.totpCode)
     return finish_registration(payload.challengeId, payload.credential, payload.deviceLabel)
 
@@ -87,19 +91,22 @@ def webauthn_credentials() -> dict[str, Any]:
 
 
 @router.delete("/api/auth/webauthn/credentials/{credential_id}", dependencies=protected)
-def webauthn_delete_credential(credential_id: str, payload: WebAuthnCredentialDeleteRequest) -> dict[str, str]:
+def webauthn_delete_credential(credential_id: str, payload: WebAuthnCredentialDeleteRequest, request: Request) -> dict[str, str]:
+    enforce_rate_limit(request, bucket="webauthn-credential-delete", limit=5, window_seconds=300)
     require_credential_management_auth(payload.totpCode)
     remove_registered_credential(credential_id)
     return {"status": "deleted"}
 
 
 @router.post("/api/auth/webauthn/authenticate/options", dependencies=protected)
-def webauthn_authenticate_options(payload: WebAuthnAuthenticateOptionsRequest) -> dict[str, Any]:
+def webauthn_authenticate_options(payload: WebAuthnAuthenticateOptionsRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="webauthn-authenticate", limit=12, window_seconds=60)
     return begin_authentication(payload.actionId, payload.serviceId)
 
 
 @router.post("/api/auth/webauthn/authenticate/verify", dependencies=protected)
-def webauthn_authenticate_verify(payload: WebAuthnAuthenticateVerifyRequest) -> dict[str, Any]:
+def webauthn_authenticate_verify(payload: WebAuthnAuthenticateVerifyRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="webauthn-authenticate", limit=12, window_seconds=60)
     return finish_authentication(
         challenge_id=payload.challengeId,
         credential=payload.credential,
@@ -213,7 +220,8 @@ def service_diagnostics(service_id: str) -> dict[str, Any]:
 
 
 @router.post("/api/admin/actions/{action_id}", dependencies=protected)
-def service_action(action_id: str, payload: ActionRequest) -> dict[str, Any]:
+def service_action(action_id: str, payload: ActionRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="admin-action", limit=8, window_seconds=60)
     action, service_id = split_action(action_id)
     service = SERVICES.get(service_id)
     if not service:
