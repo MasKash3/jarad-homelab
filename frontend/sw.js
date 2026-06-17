@@ -25,9 +25,19 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+
+  const isStaticAsset = ASSETS.some((asset) => {
+    const assetUrl = new URL(asset, self.location.origin);
+    return assetUrl.pathname === url.pathname;
+  });
+  if (!isStaticAsset && event.request.mode !== "navigate") return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
+        if (!isStaticAsset) return response;
         const clone = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         return response;
