@@ -28,7 +28,11 @@ def env(name: str, default: str, legacy_name: str | None = None) -> str:
     return default
 
 
-APP_TOKEN = env("JARAD_APP_TOKEN", "change-this-long-random-token", "HOMELAB_APP_TOKEN")
+PLACEHOLDER_APP_TOKEN = "change-this-long-random-token"
+ALLOW_INSECURE_DEFAULTS = env("JARAD_ALLOW_INSECURE_DEFAULTS", "0", "HOMELAB_ALLOW_INSECURE_DEFAULTS") == "1"
+APP_TOKEN = env("JARAD_APP_TOKEN", "", "HOMELAB_APP_TOKEN")
+if not APP_TOKEN or (APP_TOKEN == PLACEHOLDER_APP_TOKEN and not ALLOW_INSECURE_DEFAULTS):
+    raise RuntimeError("Set JARAD_APP_TOKEN to a long random value before starting Jarad Backend.")
 TOTP_SECRET = "".join(env("JARAD_TOTP_SECRET", "", "HOMELAB_TOTP_SECRET").split())
 PUBLIC_HOST = env("JARAD_PUBLIC_HOST", "home.example", "HOMELAB_PUBLIC_HOST")
 LAN_IP = env("JARAD_LAN_IP", "10.0.0.10", "HOMELAB_LAN_IP")

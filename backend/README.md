@@ -54,17 +54,18 @@ Run:
 uvicorn jarad_backend.main:app --host 127.0.0.1 --port 8443 --reload
 ```
 
-For local testing, the default token is:
+For local testing, set a real token in `backend/.env` or explicitly allow the placeholder:
 
-```text
-change-this-long-random-token
+```bash
+JARAD_APP_TOKEN=change-this-long-random-token
+JARAD_ALLOW_INSECURE_DEFAULTS=1
 ```
 
 In the PWA settings, use:
 
 ```text
 FastAPI base URL: http://127.0.0.1:8443
-Access token: change-this-long-random-token
+Access token: <JARAD_APP_TOKEN>
 ```
 
 ## Server Deployment
@@ -81,7 +82,7 @@ chmod 600 .env
 nano .env
 ```
 
-Set a long random `JARAD_APP_TOKEN` and a base32 `JARAD_TOTP_SECRET`.
+Set a long random `JARAD_APP_TOKEN` and a base32 `JARAD_TOTP_SECRET`. The backend refuses to start if `JARAD_APP_TOKEN` is missing or still set to the placeholder without `JARAD_ALLOW_INSECURE_DEFAULTS=1`.
 
 Generate a TOTP secret:
 
