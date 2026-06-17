@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 
 from .config import BACKUP_LOG, DATA_MOUNT
+from .logtail import tail_lines
 
 
 def read_uptime() -> str:
@@ -84,7 +85,7 @@ def read_backup_state() -> dict[str, str]:
             "next": "Cron schedule",
         }
 
-    lines = BACKUP_LOG.read_text(encoding="utf-8", errors="ignore").splitlines()[-200:]
+    lines = tail_lines(BACKUP_LOG, 200)
     quick = latest_matching(lines, ("Quick backup complete", "Quick backup completed"))
     full = latest_matching(lines, ("Full backup complete", "Full backup completed"))
     photos = latest_matching(lines, ("Photos backup complete", "Photos backup completed"))

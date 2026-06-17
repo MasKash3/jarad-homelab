@@ -6,6 +6,7 @@ from typing import Any
 from .command import run_command
 from .config import BACKUP_LOG, DATA_MOUNT, DNS_SERVER, PUBLIC_HOST, SERVICES
 from .docker import docker_ps, docker_restarts, docker_stats
+from .logtail import tail_lines
 
 
 def build_services() -> list[dict[str, Any]]:
@@ -79,7 +80,7 @@ def dns_ok() -> bool:
 def recent_logs(limit: int = 80) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     if BACKUP_LOG.exists():
-        for line in BACKUP_LOG.read_text(encoding="utf-8", errors="ignore").splitlines()[-limit:]:
+        for line in tail_lines(BACKUP_LOG, limit):
             level = "error" if "error" in line.lower() or "failed" in line.lower() else "info"
             rows.append({"level": level, "service": "backup", "time": "Recent", "message": line[-180:]})
 
