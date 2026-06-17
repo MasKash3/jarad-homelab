@@ -57,6 +57,13 @@ function noDataPanel(title, message) {
   `;
 }
 
+function backupStateClass(value) {
+  const text = String(value || "").toLowerCase();
+  if (text.includes("healthy") || text.includes("ok") || text.includes("clean")) return "good";
+  if (text.includes("failed") || text.includes("error")) return "bad";
+  return "warn";
+}
+
 function render() {
   renderDashboard();
   renderServices();
@@ -75,6 +82,7 @@ function renderDashboard() {
   $("#dashboardKicker").textContent = state.isEmpty ? "Connection" : "Server uptime";
   $("#dashboardTitle").textContent = state.server.uptime;
   $("#healthScore").textContent = state.server.healthScore;
+  $(".score-ring").style.setProperty("--score-progress", `${Math.max(0, Math.min(100, Number(state.server.healthScore) || 0))}%`);
   $("#metricGrid").innerHTML = state.metrics.map((metric) => `
     <article class="metric">
       <div class="metric-top">
@@ -94,6 +102,7 @@ function renderDashboard() {
   $("#storageLabel").textContent = state.storage.label;
   $("#cloudBackupLabel").textContent = state.storage.cloudBackup;
   $("#backupState").textContent = state.backups.state;
+  $("#backupState").className = `pill ${backupStateClass(state.backups.state)}`;
   $("#quickBackup").textContent = state.backups.quick;
   $("#fullBackup").textContent = state.backups.full;
   $("#nextBackup").textContent = state.backups.next;
