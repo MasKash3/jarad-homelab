@@ -4,11 +4,21 @@ import os
 from pathlib import Path
 
 
+def ensure_private_env_file(env_path: Path) -> None:
+    if os.name == "nt" or not env_path.exists():
+        return
+
+    mode = env_path.stat().st_mode & 0o777
+    if mode & 0o077:
+        raise RuntimeError(f"Refusing to start because {env_path} permissions are too broad. Run: chmod 600 {env_path}")
+
+
 def load_dotenv() -> None:
     env_path = Path.cwd() / ".env"
     if not env_path.exists():
         return
 
+    ensure_private_env_file(env_path)
     for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#") or "=" not in stripped:

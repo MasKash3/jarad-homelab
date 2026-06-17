@@ -208,11 +208,12 @@ if [[ "$frontend_only" != true ]]; then
   run scp "$caddy_path/jarad.Caddyfile" "$remote:$remote_root/deploy/caddy/jarad.Caddyfile"
 
   run ssh "$remote" "chmod +x $remote_root/scripts/server/restart-backend.sh $remote_root/scripts/server/install-systemd.sh $remote_root/scripts/server/install-caddy-route.sh"
+  run ssh "$remote" "if [ -f $remote_root/backend/.env ]; then chmod 600 $remote_root/backend/.env; fi"
 fi
 
 if [[ "$install_backend_deps" == true ]]; then
   echo "Installing backend dependencies..."
-  run ssh "$remote" "cd $remote_root/backend && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt"
+  run ssh "$remote" "cd $remote_root/backend && if [ -f .env ]; then chmod 600 .env; fi && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt"
 fi
 
 if [[ "$install_services" == true ]]; then

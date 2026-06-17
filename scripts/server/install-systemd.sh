@@ -14,6 +14,10 @@ if [ ! -d "$REMOTE_ROOT/backend/.venv" ]; then
   python3 -m venv "$REMOTE_ROOT/backend/.venv"
 fi
 
+if [ -f "$REMOTE_ROOT/backend/.env" ]; then
+  chmod 600 "$REMOTE_ROOT/backend/.env"
+fi
+
 # shellcheck disable=SC1091
 . "$REMOTE_ROOT/backend/.venv/bin/activate"
 pip install -r "$REMOTE_ROOT/backend/requirements.txt"
