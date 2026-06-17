@@ -175,6 +175,7 @@ function renderAdmin() {
 function renderConfig() {
   const settings = readSettings();
   $("#authMethodState").textContent = authMethodLabel();
+  $("#authMethodHelp").textContent = "TOTP is active for protected actions.";
   $("#backendState").textContent = settings.baseUrl || hasAutoBackend() ? "Configured" : "Mock data";
   $("#configList").innerHTML = configActions.map((item) => `
     <article class="config-card">
@@ -566,6 +567,12 @@ function bindEvents() {
 
   $$("[data-auth-method]").forEach((button) => {
     button.addEventListener("click", () => {
+      if (button.dataset.authUnavailable === "true") {
+        $("#authMethodHelp").textContent = "Fingerprint needs server-side WebAuthn before it can protect real Docker actions. Use TOTP for now.";
+        addAudit("Fingerprint unavailable", "config", "warn", "Server-side WebAuthn is not enabled");
+        renderAudit();
+        return;
+      }
       localStorage.setItem(storageKeys.authMethod, button.dataset.authMethod);
       addAudit("Changed auth method", "config", "success", authMethodLabel());
       renderConfig();

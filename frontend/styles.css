@@ -489,6 +489,17 @@ button {
   box-shadow: 0 0 18px rgba(33, 134, 255, .32);
 }
 
+.segmented button[data-auth-unavailable="true"] {
+  cursor: not-allowed;
+}
+
+.config-help {
+  margin: 10px 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .service-list,
 .alert-list,
 .log-list,

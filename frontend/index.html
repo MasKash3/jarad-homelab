@@ -214,9 +214,10 @@
               <span class="pill good" id="authMethodState">Fingerprint</span>
             </div>
             <div class="segmented wide" role="tablist" aria-label="Preferred authentication method">
-              <button type="button" data-auth-method="fingerprint" disabled title="Server-side WebAuthn is not enabled yet">Fingerprint</button>
+              <button type="button" data-auth-method="fingerprint" data-auth-unavailable="true" title="Server-side WebAuthn is not enabled yet">Fingerprint</button>
               <button class="is-selected" type="button" data-auth-method="totp">TOTP</button>
             </div>
+            <p class="config-help" id="authMethodHelp">TOTP is active for protected actions.</p>
           </section>
 
           <section class="panel">
