@@ -12,6 +12,7 @@ let pendingService = null;
 let activeServiceId = null;
 let pendingAuth = null;
 let passkeyCredentials = [];
+let pendingTotpResolve = null;
 let state = createNoDataState();
 let connectionState = {
   mode: "disconnected",
@@ -569,7 +570,9 @@ async function registerThisDevicePasskey() {
   button.disabled = true;
   button.textContent = "Registering...";
   try {
-    const totpCode = passkeyCredentials.length ? promptForTotp("Enter your TOTP code to register another passkey.") : null;
+    const totpCode = passkeyCredentials.length
+      ? await requestTotpForPasskeyManagement("Register Passkey", "Enter your TOTP code to register another passkey.")
+      : null;
     if (passkeyCredentials.length && !totpCode) {
       throw new Error("TOTP is required to register another passkey.");
     }
@@ -587,7 +590,7 @@ async function registerThisDevicePasskey() {
 
 async function deletePasskey(credentialId) {
   try {
-    const totpCode = promptForTotp("Enter your TOTP code to remove this passkey.");
+    const totpCode = await requestTotpForPasskeyManagement("Remove Passkey", "Enter your TOTP code to remove this passkey.");
     if (!totpCode) {
       throw new Error("TOTP is required to remove a passkey.");
     }
@@ -600,11 +603,35 @@ async function deletePasskey(credentialId) {
   }
 }
 
-function promptForTotp(message) {
-  const code = window.prompt(message);
-  const value = String(code || "").trim();
-  if (!/^\d{6}$/.test(value)) return null;
-  return value;
+function requestTotpForPasskeyManagement(title, message) {
+  return new Promise((resolve) => {
+    pendingTotpResolve = resolve;
+    $("#totpManageTitle").textContent = title;
+    $("#totpManageCopy").textContent = message;
+    $("#totpManageError").textContent = "";
+    $("#totpManageError").hidden = true;
+    $("#totpManageInput").value = "";
+    $("#totpManageSheet").showModal();
+    window.setTimeout(() => $("#totpManageInput").focus(), 0);
+  });
+}
+
+function resolveTotpManagement(value) {
+  if (!pendingTotpResolve) return;
+  const resolve = pendingTotpResolve;
+  pendingTotpResolve = null;
+  resolve(value);
+}
+
+function submitTotpManagement() {
+  const value = $("#totpManageInput").value.trim();
+  if (!/^\d{6}$/.test(value)) {
+    $("#totpManageError").textContent = "TOTP must be exactly 6 digits.";
+    $("#totpManageError").hidden = false;
+    return;
+  }
+  resolveTotpManagement(value);
+  $("#totpManageSheet").close();
 }
 
 function bindEvents() {
@@ -618,6 +645,16 @@ function bindEvents() {
   });
   $("[data-close-settings]").addEventListener("click", () => $("#settingsSheet").close());
   $("[data-close-auth]").addEventListener("click", () => $("#authSheet").close());
+  $("#totpManageCancelButton").addEventListener("click", () => $("#totpManageSheet").close());
+  $("#totpManageSheet").addEventListener("close", () => resolveTotpManagement(null));
+  $("#totpManageForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitTotpManagement();
+  });
+  $("#totpManageInput").addEventListener("input", () => {
+    $("#totpManageError").textContent = "";
+    $("#totpManageError").hidden = true;
+  });
 
   $("#refreshButton").addEventListener("click", () => refreshState({ preserveServiceSheet: true }));
   $("#settingsButton").addEventListener("click", () => $("#settingsSheet").showModal());

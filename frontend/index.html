@@ -310,6 +310,30 @@
       </div>
     </dialog>
 
+    <dialog class="sheet auth-sheet" id="totpManageSheet">
+      <div class="sheet-head">
+        <div>
+          <p class="eyebrow">Passkey management</p>
+          <h2 id="totpManageTitle">Confirm TOTP</h2>
+        </div>
+        <button class="icon-button" id="totpManageCancelButton" type="button" aria-label="Cancel TOTP confirmation" title="Cancel">
+          <svg><use href="#icon-close"></use></svg>
+        </button>
+      </div>
+      <form class="auth-body" id="totpManageForm">
+        <div class="auth-symbol">
+          <svg><use href="#icon-shield"></use></svg>
+        </div>
+        <p id="totpManageCopy">Enter your TOTP code to continue.</p>
+        <p class="auth-error" id="totpManageError" role="alert" aria-live="polite" hidden></p>
+        <label class="confirm-code">
+          <span>TOTP code</span>
+          <input id="totpManageInput" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+        </label>
+        <button class="primary-button" type="submit">Continue</button>
+      </form>
+    </dialog>
+
     <dialog class="sheet" id="settingsSheet">
       <div class="sheet-head">
         <div>
