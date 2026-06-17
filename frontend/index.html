@@ -161,12 +161,15 @@
         <section class="screen" id="screen-logs" aria-labelledby="logsTitle">
           <div class="section-head tight">
             <div>
-              <p class="eyebrow">Recent events</p>
+              <p class="eyebrow" id="logsKicker">Recent events</p>
               <h2 id="logsTitle">Logs</h2>
             </div>
-            <button class="icon-button" id="liveTailButton" type="button" aria-label="Toggle live tail" title="Toggle live tail">
-              <svg><use href="#icon-play"></use></svg>
-            </button>
+            <div class="section-actions">
+              <button class="text-button" id="backToServicesButton" type="button" hidden>Back to Services</button>
+              <button class="icon-button" id="liveTailButton" type="button" aria-label="Toggle live tail" title="Toggle live tail">
+                <svg><use href="#icon-play"></use></svg>
+              </button>
+            </div>
           </div>
           <label class="search-box">
             <svg><use href="#icon-search"></use></svg>

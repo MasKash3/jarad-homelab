@@ -6,6 +6,7 @@ import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHt
 
 let serviceFilter = "all";
 let logFilter = "all";
+let logContext = null;
 let liveTail = false;
 let pendingAction = null;
 let pendingService = null;
@@ -143,6 +144,9 @@ function renderServices() {
 
 function renderLogs() {
   renderLiveTailButton();
+  $("#logsKicker").textContent = logContext ? "Service logs" : "Recent events";
+  $("#logsTitle").textContent = logContext ? `${logContext.name} Logs` : "Logs";
+  $("#backToServicesButton").hidden = !logContext;
   const search = $("#logSearch").value.trim().toLowerCase();
   const logs = state.logs.filter((log) => {
     const matchesFilter = logFilter === "all" || log.level === logFilter || log.service === logFilter;
@@ -353,6 +357,7 @@ async function loadServiceLogs(service) {
       time: log.time || "Recent",
       message: log.message || ""
     }));
+    logContext = { serviceId: service.id, name: service.name };
     $("#serviceSheet").close();
     setActiveScreen("logs");
     $("#logSearch").value = "";
@@ -506,6 +511,9 @@ function renderAuthError(message) {
 }
 
 function setActiveScreen(screenName) {
+  if (screenName !== "logs") {
+    logContext = null;
+  }
   $$(".screen").forEach((screen) => screen.classList.toggle("is-active", screen.id === `screen-${screenName}`));
   $$(".bottom-nav [data-nav]").forEach((button) => button.classList.toggle("is-active", button.dataset.nav === screenName));
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -658,6 +666,7 @@ function bindEvents() {
 
   $("#refreshButton").addEventListener("click", () => refreshState({ preserveServiceSheet: true }));
   $("#settingsButton").addEventListener("click", () => $("#settingsSheet").showModal());
+  $("#backToServicesButton").addEventListener("click", () => setActiveScreen("services"));
   $("#fingerprintAuthButton").addEventListener("click", completeFingerprintAuth);
   $("#totpAuthButton").addEventListener("click", completeTotpAuth);
   $("#authTotpInput").addEventListener("input", () => renderAuthError(""));
@@ -680,6 +689,7 @@ function bindEvents() {
 
   $("#logSearch").addEventListener("input", renderLogs);
   $("#liveTailButton").addEventListener("click", () => {
+    logContext = null;
     liveTail = !liveTail;
     renderLiveTailButton();
     state.logs.unshift({
