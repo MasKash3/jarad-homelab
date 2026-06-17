@@ -16,6 +16,7 @@ from .models import (
     TotpCheckRequest,
     WebAuthnAuthenticateOptionsRequest,
     WebAuthnAuthenticateVerifyRequest,
+    WebAuthnCredentialDeleteRequest,
     WebAuthnRegisterOptionsRequest,
     WebAuthnRegisterVerifyRequest,
 )
@@ -44,6 +45,13 @@ def diagnostic_state(value: str) -> str:
     return "pass"
 
 
+def require_credential_management_auth(totp_code: str | None) -> None:
+    if not list_registered_credentials():
+        return
+    if not verify_totp(totp_code or ""):
+        raise HTTPException(status_code=401, detail="TOTP is required to manage passkeys")
+
+
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "host": socket.gethostname()}
@@ -63,11 +71,13 @@ def check_totp(payload: TotpCheckRequest) -> dict[str, Any]:
 
 @router.post("/api/auth/webauthn/register/options", dependencies=protected)
 def webauthn_register_options(payload: WebAuthnRegisterOptionsRequest) -> dict[str, Any]:
+    require_credential_management_auth(payload.totpCode)
     return begin_registration(payload.deviceLabel)
 
 
 @router.post("/api/auth/webauthn/register/verify", dependencies=protected)
 def webauthn_register_verify(payload: WebAuthnRegisterVerifyRequest) -> dict[str, Any]:
+    require_credential_management_auth(payload.totpCode)
     return finish_registration(payload.challengeId, payload.credential, payload.deviceLabel)
 
 
@@ -77,7 +87,8 @@ def webauthn_credentials() -> dict[str, Any]:
 
 
 @router.delete("/api/auth/webauthn/credentials/{credential_id}", dependencies=protected)
-def webauthn_delete_credential(credential_id: str) -> dict[str, str]:
+def webauthn_delete_credential(credential_id: str, payload: WebAuthnCredentialDeleteRequest) -> dict[str, str]:
+    require_credential_management_auth(payload.totpCode)
     remove_registered_credential(credential_id)
     return {"status": "deleted"}
 

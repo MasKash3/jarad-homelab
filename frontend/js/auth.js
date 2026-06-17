@@ -1,14 +1,14 @@
-export async function registerPasskey(api) {
+export async function registerPasskey(api, totpCode) {
   assertWebAuthnAvailable();
   const deviceLabel = defaultDeviceLabel();
-  const { challengeId, options } = await api.getPasskeyRegistrationOptions(deviceLabel);
+  const { challengeId, options } = await api.getPasskeyRegistrationOptions(deviceLabel, totpCode);
   const credential = await navigator.credentials.create({
     publicKey: decodeCreationOptions(options)
   });
   if (!credential) {
     throw new Error("Passkey setup was cancelled.");
   }
-  return api.verifyPasskeyRegistration(challengeId, publicKeyCredentialToJSON(credential), deviceLabel);
+  return api.verifyPasskeyRegistration(challengeId, publicKeyCredentialToJSON(credential), deviceLabel, totpCode);
 }
 
 export async function verifyPasskeyForAction(api, action) {

@@ -19,12 +19,18 @@ class TotpCheckRequest(BaseModel):
 
 class WebAuthnRegisterOptionsRequest(BaseModel):
     deviceLabel: str | None = None
+    totpCode: str | None = None
 
 
 class WebAuthnRegisterVerifyRequest(BaseModel):
     challengeId: str
     deviceLabel: str | None = None
     credential: dict
+    totpCode: str | None = None
+
+
+class WebAuthnCredentialDeleteRequest(BaseModel):
+    totpCode: str | None = None
 
 
 class WebAuthnAuthenticateOptionsRequest(BaseModel):

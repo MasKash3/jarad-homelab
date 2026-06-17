@@ -99,21 +99,22 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
   async listPasskeys() {
     return request("/api/auth/webauthn/credentials");
   },
-  async deletePasskey(credentialId) {
+  async deletePasskey(credentialId, totpCode) {
     return request(`/api/auth/webauthn/credentials/${encodeURIComponent(credentialId)}`, {
-      method: "DELETE"
+      method: "DELETE",
+      body: JSON.stringify({ totpCode })
     });
   },
-  async getPasskeyRegistrationOptions(deviceLabel) {
+  async getPasskeyRegistrationOptions(deviceLabel, totpCode) {
     return request("/api/auth/webauthn/register/options", {
       method: "POST",
-      body: JSON.stringify({ deviceLabel })
+      body: JSON.stringify({ deviceLabel, totpCode })
     });
   },
-  async verifyPasskeyRegistration(challengeId, credential, deviceLabel) {
+  async verifyPasskeyRegistration(challengeId, credential, deviceLabel, totpCode) {
     return request("/api/auth/webauthn/register/verify", {
       method: "POST",
-      body: JSON.stringify({ challengeId, credential, deviceLabel })
+      body: JSON.stringify({ challengeId, credential, deviceLabel, totpCode })
     });
   },
   async getPasskeyAuthenticationOptions(action) {

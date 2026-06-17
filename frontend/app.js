@@ -569,7 +569,11 @@ async function registerThisDevicePasskey() {
   button.disabled = true;
   button.textContent = "Registering...";
   try {
-    const result = await registerPasskey(api);
+    const totpCode = passkeyCredentials.length ? promptForTotp("Enter your TOTP code to register another passkey.") : null;
+    if (passkeyCredentials.length && !totpCode) {
+      throw new Error("TOTP is required to register another passkey.");
+    }
+    const result = await registerPasskey(api, totpCode);
     addAudit("Registered passkey", "config", "success", result.deviceLabel || "This device");
     await refreshPasskeys();
   } catch (error) {
@@ -583,13 +587,24 @@ async function registerThisDevicePasskey() {
 
 async function deletePasskey(credentialId) {
   try {
-    await api.deletePasskey(credentialId);
+    const totpCode = promptForTotp("Enter your TOTP code to remove this passkey.");
+    if (!totpCode) {
+      throw new Error("TOTP is required to remove a passkey.");
+    }
+    await api.deletePasskey(credentialId, totpCode);
     addAudit("Removed passkey", "config", "success");
     await refreshPasskeys();
   } catch (error) {
     addAudit("Remove passkey failed", "config", "failure", error.message);
     $("#authMethodHelp").textContent = error.message;
   }
+}
+
+function promptForTotp(message) {
+  const code = window.prompt(message);
+  const value = String(code || "").trim();
+  if (!/^\d{6}$/.test(value)) return null;
+  return value;
 }
 
 function bindEvents() {
