@@ -2,7 +2,7 @@ import { configActions, legacyStorageKeys, serviceActions, storageKeys } from '.
 import { cloneMockState } from './js/mock-state.js';
 import { createApi } from './js/api.js';
 import { verifyFingerprint } from './js/auth.js';
-import { $, $$, colorForState, diagnosticState, emptyState, formatHealth, formatUpdated, labelForState, resourceRow, stateClass } from './js/utils.js';
+import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -66,12 +66,12 @@ function renderDashboard() {
   $("#metricGrid").innerHTML = state.metrics.map((metric) => `
     <article class="metric">
       <div class="metric-top">
-        <span>${metric.label}</span>
-        <span class="pill ${metric.state}">${metric.badge || labelForState(metric.state)}</span>
+        <span>${escapeHtml(metric.label)}</span>
+        <span class="pill ${escapeAttr(metric.state)}">${escapeHtml(metric.badge || labelForState(metric.state))}</span>
       </div>
-      <strong>${metric.value}${metric.unit}</strong>
+      <strong>${escapeHtml(metric.value)}${escapeHtml(metric.unit)}</strong>
       <div class="mini-bar" style="--bar-color:${colorForState(metric.state)}">
-        <span style="--value:${metric.value}%"></span>
+        <span style="--value:${Number(metric.value) || 0}%"></span>
       </div>
     </article>
   `).join("");
@@ -86,9 +86,9 @@ function renderDashboard() {
   $("#nextBackup").textContent = state.backups.next;
 
   $("#launcherGrid").innerHTML = state.services.map((service) => `
-    <a class="launcher" href="${service.url}" target="_blank" rel="noreferrer" style="--app-color:${service.color}">
-      <b>${service.icon}</b>
-      <span>${service.name}</span>
+    <a class="launcher" href="${escapeAttr(safeUrl(service.url))}" target="_blank" rel="noreferrer" style="--app-color:${safeCssColor(service.color)}">
+      <b>${escapeHtml(service.icon)}</b>
+      <span>${escapeHtml(service.name)}</span>
     </a>
   `).join("");
 }
@@ -102,13 +102,13 @@ function renderServices() {
   });
 
   $("#serviceList").innerHTML = services.map((service) => `
-    <button class="service-card" type="button" data-service-id="${service.id}">
-      <span class="service-icon" style="--app-color:${service.color}">${service.icon}</span>
+    <button class="service-card" type="button" data-service-id="${escapeAttr(service.id)}">
+      <span class="service-icon" style="--app-color:${safeCssColor(service.color)}">${escapeHtml(service.icon)}</span>
       <div>
-        <h3>${service.name}</h3>
-        <p>${service.container}</p>
+        <h3>${escapeHtml(service.name)}</h3>
+        <p>${escapeHtml(service.container)}</p>
       </div>
-      <span class="pill ${stateClass(service)}">${formatHealth(service.health)}</span>
+      <span class="pill ${escapeAttr(stateClass(service))}">${escapeHtml(formatHealth(service.health))}</span>
       <svg class="row-chevron"><use href="#icon-link"></use></svg>
     </button>
   `).join("") || emptyState("No services match this filter.");
@@ -130,10 +130,10 @@ function renderLogs() {
   $("#logList").innerHTML = logs.map((log) => `
     <article class="log-entry ${log.level === "error" ? "error" : ""}">
       <header>
-        <strong>${log.service.toUpperCase()} / ${log.level}</strong>
-        <time>${log.time}</time>
+        <strong>${escapeHtml(String(log.service).toUpperCase())} / ${escapeHtml(log.level)}</strong>
+        <time>${escapeHtml(log.time)}</time>
       </header>
-      <p>${log.message}</p>
+      <p>${escapeHtml(log.message)}</p>
     </article>
   `).join("") || emptyState("No log entries found.");
 }
@@ -152,18 +152,18 @@ function renderAlerts() {
   const active = state.alerts.filter((alert) => alert.time === "Active").length;
   $("#activeAlertCount").textContent = `${active} active`;
   $("#alertList").innerHTML = state.alerts.map((alert) => `
-    <article class="alert-card ${alert.state}">
+    <article class="alert-card ${escapeAttr(alert.state)}">
       <header>
-        <strong>${alert.title}</strong>
-        <time>${alert.time}</time>
+        <strong>${escapeHtml(alert.title)}</strong>
+        <time>${escapeHtml(alert.time)}</time>
       </header>
-      <p>${alert.body}</p>
+      <p>${escapeHtml(alert.body)}</p>
     </article>
   `).join("");
   $("#networkGrid").innerHTML = state.network.map(([label, value]) => `
     <div>
-      <span>${label}</span>
-      <strong>${value}</strong>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
     </div>
   `).join("");
 }
@@ -179,10 +179,10 @@ function renderConfig() {
   $("#configList").innerHTML = configActions.map((item) => `
     <article class="config-card">
       <div>
-        <strong>${item.title}</strong>
-        <p>${item.detail}</p>
+        <strong>${escapeHtml(item.title)}</strong>
+        <p>${escapeHtml(item.detail)}</p>
       </div>
-      <span class="pill info">${item.target}</span>
+      <span class="pill info">${escapeHtml(item.target)}</span>
     </article>
   `).join("");
 
@@ -197,10 +197,10 @@ function renderAudit() {
   $("#auditList").innerHTML = audit.slice(0, 12).map((item) => `
     <article class="audit-item">
       <header>
-        <strong>${item.action}</strong>
-        <time>${item.time}</time>
+        <strong>${escapeHtml(item.action)}</strong>
+        <time>${escapeHtml(item.time)}</time>
       </header>
-      <p>${item.status} - ${item.target}${item.details ? ` - ${item.details}` : ""}</p>
+      <p>${escapeHtml(item.status)} - ${escapeHtml(item.target)}${item.details ? ` - ${escapeHtml(item.details)}` : ""}</p>
     </article>
   `).join("") || emptyState("No local audit entries yet.");
 }
@@ -230,26 +230,26 @@ function openService(serviceId, options = {}) {
   $("#sheetServiceType").textContent = service.container;
   $("#serviceDetailBody").innerHTML = `
     <div class="service-detail-hero">
-      <span class="service-icon large" style="--app-color:${service.color}">${service.icon}</span>
+      <span class="service-icon large" style="--app-color:${safeCssColor(service.color)}">${escapeHtml(service.icon)}</span>
       <div>
-        <h3>${service.name}</h3>
-        <p>${service.image}</p>
+        <h3>${escapeHtml(service.name)}</h3>
+        <p>${escapeHtml(service.image)}</p>
       </div>
-      <span class="pill ${stateClass(service)}">${formatHealth(service.health)}</span>
+      <span class="pill ${escapeAttr(stateClass(service))}">${escapeHtml(formatHealth(service.health))}</span>
     </div>
     <div class="detail-grid">
-      <div><span>Status</span><strong>${service.status}</strong></div>
-      <div><span>Uptime</span><strong>${state.server.uptime}</strong></div>
-      <div><span>Auto restarts</span><strong>${service.restarts}</strong></div>
-      <div><span>Last issue</span><strong>${service.lastError}</strong></div>
+      <div><span>Status</span><strong>${escapeHtml(service.status)}</strong></div>
+      <div><span>Uptime</span><strong>${escapeHtml(state.server.uptime)}</strong></div>
+      <div><span>Auto restarts</span><strong>${escapeHtml(service.restarts)}</strong></div>
+      <div><span>Last issue</span><strong>${escapeHtml(service.lastError)}</strong></div>
     </div>
     <h3 class="subhead">Quick Actions</h3>
     <div class="quick-actions">
       ${actionsForService(service).map((action) => `
-        <button class="quick-action ${action.danger ? "danger" : ""}" type="button" data-service-action="${action.kind}" data-service-id="${service.id}">
-          <svg><use href="#${action.icon}"></use></svg>
-          <strong>${action.title}</strong>
-          <span data-action-label>${action.protected ? `${authMethodLabel()} required` : action.detail}</span>
+        <button class="quick-action ${action.danger ? "danger" : ""}" type="button" data-service-action="${escapeAttr(action.kind)}" data-service-id="${escapeAttr(service.id)}">
+          <svg><use href="#${escapeAttr(action.icon)}"></use></svg>
+          <strong>${escapeHtml(action.title)}</strong>
+          <span data-action-label>${escapeHtml(action.protected ? `${authMethodLabel()} required` : action.detail)}</span>
         </button>
       `).join("")}
     </div>
@@ -263,8 +263,8 @@ function openService(serviceId, options = {}) {
     <div class="diagnostic-list">
       ${service.diagnostics.map(([label, value]) => `
         <div class="diagnostic-step">
-          <span>${label}</span>
-          <strong>${value}</strong>
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
           <b class="status-dot ${diagnosticState(value)}"></b>
         </div>
       `).join("")}
@@ -340,8 +340,8 @@ async function loadServiceDiagnostics(service, button) {
     const list = $("#serviceDetailBody .diagnostic-list");
     list.innerHTML = service.diagnostics.map(([label, value]) => `
       <div class="diagnostic-step">
-        <span>${label}</span>
-        <strong>${value}</strong>
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value)}</strong>
         <b class="status-dot ${diagnosticState(value)}"></b>
       </div>
     `).join("");

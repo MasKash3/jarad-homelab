@@ -1,9 +1,11 @@
 export function resourceRow(label, value, max, unit, stateName) {
+  const safeLabel = escapeHtml(label);
+  const safeUnit = escapeHtml(unit);
   if (value === null || value === undefined || max === null || max === undefined || max === 0) {
     return `
       <div class="resource-row">
         <div>
-          <span>${label}</span>
+          <span>${safeLabel}</span>
           <strong>Unavailable</strong>
         </div>
         <div class="mini-bar muted-bar">
@@ -16,8 +18,8 @@ export function resourceRow(label, value, max, unit, stateName) {
   return `
     <div class="resource-row">
       <div>
-        <span>${label}</span>
-        <strong>${formatResource(value, max, unit)}</strong>
+        <span>${safeLabel}</span>
+        <strong>${escapeHtml(formatResource(value, max, safeUnit))}</strong>
       </div>
       <div class="mini-bar" style="--bar-color:${colorForState(stateName)}">
         <span style="--value:${pct}%"></span>
@@ -71,7 +73,7 @@ export function colorForState(stateName) {
 }
 
 export function emptyState(message) {
-  return `<div class="audit-item"><p>${message}</p></div>`;
+  return `<div class="audit-item"><p>${escapeHtml(message)}</p></div>`;
 }
 export const $ = (selector) => document.querySelector(selector);
 export const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -82,4 +84,33 @@ export function readJsonStorage(key, fallback) {
   } catch {
     return fallback;
   }
+}
+
+export function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[char]));
+}
+
+export function escapeAttr(value) {
+  return escapeHtml(value).replace(/`/g, "&#96;");
+}
+
+export function safeCssColor(value) {
+  const text = String(value || "").trim();
+  return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(text) ? text : "#138a53";
+}
+
+export function safeUrl(value) {
+  try {
+    const url = new URL(String(value), window.location.origin);
+    if (url.protocol === "http:" || url.protocol === "https:") return url.href;
+  } catch {
+    // Fall through to the inert fallback.
+  }
+  return "#";
 }
