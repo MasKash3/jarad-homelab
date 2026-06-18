@@ -41,7 +41,7 @@ awk '
 
 cat "$tmp_clean" "$tmp_rendered" > "$tmp_new"
 
-if ! docker exec -i caddy caddy validate --config /dev/stdin < "$tmp_new"; then
+if ! docker exec -i caddy caddy validate --adapter caddyfile --config /dev/stdin < "$tmp_new"; then
   rm -f "$tmp_rendered" "$tmp_clean" "$tmp_new"
   echo "Generated Caddyfile failed validation; existing config was not changed." >&2
   exit 1

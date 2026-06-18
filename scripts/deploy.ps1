@@ -127,6 +127,19 @@ if (-not $FrontendOnly) {
   Invoke-Checked "ssh" @($remote, "chmod +x $RemoteRoot/scripts/server/restart-backend.sh $RemoteRoot/scripts/server/install-systemd.sh $RemoteRoot/scripts/server/install-caddy-route.sh")
 }
 
+if ($InstallCaddy -and $FrontendOnly) {
+  Write-Host "Deploying Caddy installer..." -ForegroundColor Cyan
+  Invoke-Checked "scp" @(
+    (Join-Path $serverScriptsPath "install-caddy-route.sh"),
+    "${remote}:$RemoteRoot/scripts/server/install-caddy-route.sh"
+  )
+  Invoke-Checked "scp" @(
+    (Join-Path $caddyPath "jarad.Caddyfile"),
+    "${remote}:$RemoteRoot/deploy/caddy/jarad.Caddyfile"
+  )
+  Invoke-Checked "ssh" @($remote, "chmod +x $RemoteRoot/scripts/server/install-caddy-route.sh")
+}
+
 if ($InstallBackendDeps) {
   Write-Host "Installing backend dependencies..." -ForegroundColor Cyan
   Invoke-Checked "ssh" @(
