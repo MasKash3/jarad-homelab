@@ -917,6 +917,18 @@ button {
   border: 0;
   border-radius: var(--radius);
   font-weight: 800;
+  outline: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.primary-button:focus-visible,
+.danger-button:focus-visible,
+.text-button:focus-visible,
+.icon-button:focus-visible,
+.action-button:focus-visible,
+.segmented button:focus-visible,
+.bottom-nav button:focus-visible {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgba(33, 134, 255, .72);
 }
 
 .primary-button,

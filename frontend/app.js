@@ -789,8 +789,8 @@ function bindEvents() {
       renderConfig();
     });
   });
-  $("#registerPasskeyButton").addEventListener("click", registerThisDevicePasskey);
-  $("#registerDeviceTokenButton").addEventListener("click", registerThisDeviceToken);
+  $("#registerPasskeyButton")?.addEventListener("click", registerThisDevicePasskey);
+  $("#registerDeviceTokenButton")?.addEventListener("click", registerThisDeviceToken);
 
   $("#clearAuditButton").addEventListener("click", () => {
     localStorage.removeItem(storageKeys.audit);
