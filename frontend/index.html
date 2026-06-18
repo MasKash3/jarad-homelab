@@ -62,7 +62,10 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">Private network</p>
-          <h1>Jarad</h1>
+          <div class="brand-line">
+            <h1>Jarad</h1>
+            <span class="version-chip" id="appVersion">v2026.06.18.4</span>
+          </div>
         </div>
         <div class="topbar-actions">
           <button class="icon-button" id="refreshButton" type="button" aria-label="Refresh data" title="Refresh data">
@@ -376,6 +379,6 @@
         document.documentElement.dataset.appError = event.reason?.message || "Unhandled startup error";
       });
     </script>
-    <script src="app.js?v=20260618-device-tokens" type="module"></script>
+    <script src="app.js?v=2026.06.18.4" type="module"></script>
   </body>
 </html>

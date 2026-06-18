@@ -1,9 +1,9 @@
-const CACHE_NAME = "jarad-v3";
+const CACHE_NAME = "jarad-2026.06.18.4";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
-  "./app.js?v=20260618-device-tokens",
+  "./app.js?v=2026.06.18.4",
   "./manifest.webmanifest",
   "./icons/icon-192.svg",
   "./icons/icon-512.svg"

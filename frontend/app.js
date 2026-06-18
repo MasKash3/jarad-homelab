@@ -1,4 +1,4 @@
-import { configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js';
 import { createNoDataState } from './js/empty-state.js';
 import { createApi } from './js/api.js';
 import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js';
@@ -73,12 +73,17 @@ function backupStateClass(value) {
 }
 
 function render() {
+  renderAppVersion();
   renderDashboard();
   renderServices();
   renderLogs();
   renderAlerts();
   renderAdmin();
   renderSettings();
+}
+
+function renderAppVersion() {
+  $("#appVersion").textContent = `v${APP_VERSION}`;
 }
 
 function renderDashboard() {
