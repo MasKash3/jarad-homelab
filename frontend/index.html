@@ -371,14 +371,7 @@
       </form>
     </dialog>
 
-    <script>
-      window.addEventListener("error", (event) => {
-        document.documentElement.dataset.appError = event.message;
-      });
-      window.addEventListener("unhandledrejection", (event) => {
-        document.documentElement.dataset.appError = event.reason?.message || "Unhandled startup error";
-      });
-    </script>
-    <script src="app.js?v=2026.06.18.4" type="module"></script>
+    <script src="js/error-handler.js?v=2026.06.18.5"></script>
+    <script src="app.js?v=2026.06.18.5" type="module"></script>
   </body>
 </html>

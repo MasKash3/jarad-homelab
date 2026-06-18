@@ -1,9 +1,10 @@
-const CACHE_NAME = "jarad-2026.06.18.4";
+const CACHE_NAME = "jarad-2026.06.18.5";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
-  "./app.js?v=2026.06.18.4",
+  "./js/error-handler.js?v=2026.06.18.5",
+  "./app.js?v=2026.06.18.5",
   "./manifest.webmanifest",
   "./icons/icon-192.svg",
   "./icons/icon-512.svg"
