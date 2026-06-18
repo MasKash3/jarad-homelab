@@ -99,6 +99,21 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
   async listPasskeys() {
     return request("/api/auth/webauthn/credentials");
   },
+  async listDevices() {
+    return request("/api/auth/devices");
+  },
+  async registerDeviceToken(deviceLabel, totpCode) {
+    return request("/api/auth/devices/register", {
+      method: "POST",
+      body: JSON.stringify({ deviceLabel, totpCode })
+    });
+  },
+  async revokeDeviceToken(deviceId, totpCode) {
+    return request(`/api/auth/devices/${encodeURIComponent(deviceId)}`, {
+      method: "DELETE",
+      body: JSON.stringify({ totpCode })
+    });
+  },
   async deletePasskey(credentialId, totpCode) {
     return request(`/api/auth/webauthn/credentials/${encodeURIComponent(credentialId)}`, {
       method: "DELETE",

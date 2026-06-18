@@ -4,19 +4,56 @@ import base64
 import binascii
 import hashlib
 import hmac
+import secrets
 import time
 
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Request
 
 from .config import APP_TOKEN, TOTP_SECRET
 from .models import ActionRequest
 from .webauthn_auth import consume_action_token
+from .webauthn_store import WebAuthnStore
 
 
-def require_token(authorization: str | None = Header(default=None)) -> None:
-    expected = f"Bearer {APP_TOKEN}"
-    if authorization != expected:
+store = WebAuthnStore()
+BOOTSTRAP_ALLOWED_PATHS = {"/api/auth/devices/register"}
+
+
+def hash_access_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def require_token(request: Request, authorization: str | None = Header(default=None)) -> None:
+    token = bearer_token(authorization)
+    if not token:
         raise HTTPException(status_code=401, detail="Invalid or missing bearer token")
+
+    device = store.get_active_device_token(hash_access_token(token))
+    if device:
+        request.state.auth_actor = f"device:{device['device_id']}"
+        request.state.auth_device_id = device["device_id"]
+        request.state.auth_device_label = device["device_label"]
+        return
+
+    if secrets.compare_digest(token, APP_TOKEN):
+        active_devices_exist = store.has_active_device_tokens()
+        if active_devices_exist and request.url.path not in BOOTSTRAP_ALLOWED_PATHS:
+            raise HTTPException(status_code=401, detail="Use a registered device token for this request")
+        request.state.auth_actor = "bootstrap-token"
+        request.state.auth_device_id = None
+        request.state.auth_device_label = "Bootstrap token"
+        return
+
+    raise HTTPException(status_code=401, detail="Invalid or missing bearer token")
+
+
+def bearer_token(authorization: str | None) -> str | None:
+    if not authorization:
+        return None
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+    return token
 
 
 def verify_action_auth(payload: ActionRequest, action_id: str, service_id: str) -> None:

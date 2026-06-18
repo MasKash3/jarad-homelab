@@ -98,6 +98,22 @@ class WebAuthnStore:
             )
             db.execute("CREATE INDEX IF NOT EXISTS idx_audit_events_created_at ON audit_events(created_at)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_audit_events_event_type ON audit_events(event_type)")
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS device_tokens (
+                    device_id TEXT PRIMARY KEY,
+                    token_hash TEXT NOT NULL UNIQUE,
+                    device_label TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    last_used_at TEXT,
+                    revoked_at TEXT,
+                    remote_addr TEXT,
+                    user_agent TEXT
+                )
+                """
+            )
+            db.execute("CREATE INDEX IF NOT EXISTS idx_device_tokens_token_hash ON device_tokens(token_hash)")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_device_tokens_created_at ON device_tokens(created_at)")
 
     def create_challenge(
         self,
@@ -268,3 +284,76 @@ class WebAuthnStore:
                 ),
             )
         return audit_id
+
+    def create_device_token(
+        self,
+        *,
+        token_hash: str,
+        device_label: str,
+        remote_addr: str | None = None,
+        user_agent: str | None = None,
+    ) -> dict[str, Any]:
+        now = iso(utc_now())
+        device_id = secrets.token_urlsafe(18)
+        with self.connect() as db:
+            db.execute(
+                """
+                INSERT INTO device_tokens
+                    (device_id, token_hash, device_label, created_at, remote_addr, user_agent)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (device_id, token_hash, device_label, now, remote_addr, user_agent),
+            )
+        return {
+            "device_id": device_id,
+            "device_label": device_label,
+            "created_at": now,
+            "last_used_at": None,
+            "revoked_at": None,
+            "remote_addr": remote_addr,
+            "user_agent": user_agent,
+        }
+
+    def get_active_device_token(self, token_hash: str) -> dict[str, Any] | None:
+        with self.connect() as db:
+            row = db.execute(
+                """
+                SELECT * FROM device_tokens
+                WHERE token_hash = ? AND revoked_at IS NULL
+                """,
+                (token_hash,),
+            ).fetchone()
+            if not row:
+                return None
+            db.execute("UPDATE device_tokens SET last_used_at = ? WHERE device_id = ?", (iso(utc_now()), row["device_id"]))
+            return dict(row)
+
+    def has_active_device_tokens(self) -> bool:
+        with self.connect() as db:
+            row = db.execute("SELECT 1 FROM device_tokens WHERE revoked_at IS NULL LIMIT 1").fetchone()
+            return bool(row)
+
+    def list_device_tokens(self) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            return [
+                dict(row)
+                for row in db.execute(
+                    """
+                    SELECT device_id, device_label, created_at, last_used_at, revoked_at, remote_addr, user_agent
+                    FROM device_tokens
+                    ORDER BY revoked_at IS NOT NULL, last_used_at DESC, created_at DESC
+                    """
+                ).fetchall()
+            ]
+
+    def revoke_device_token(self, device_id: str) -> bool:
+        with self.connect() as db:
+            result = db.execute(
+                """
+                UPDATE device_tokens
+                SET revoked_at = ?
+                WHERE device_id = ? AND revoked_at IS NULL
+                """,
+                (iso(utc_now()), device_id),
+            )
+            return result.rowcount > 0

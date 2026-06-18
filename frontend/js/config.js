@@ -21,8 +21,8 @@ export const serviceActions = [
 ];
 
 export const configActions = [
-  { title: "Backend", detail: "FastAPI URL and access token", target: "Private API" },
+  { title: "Backend", detail: "FastAPI URL and bootstrap token", target: "Private API" },
+  { title: "Devices", detail: "Revocable per-device access tokens", target: "Backend" },
   { title: "Authentication", detail: "Choose fingerprint or TOTP for protected actions", target: "Local device" },
   { title: "Audit", detail: "Recent app and action records", target: "Local log" }
 ];
-

@@ -10,10 +10,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from .audit import audit_event
 from .auth import require_token, verify_action_auth, verify_totp
 from .config import LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
+from .device_tokens import create_device_token, list_device_tokens, revoke_device_token
 from .docker import docker_action, docker_logs
 from .metrics import read_backup_state, read_cpu_pct, read_disk, read_raid_state, read_ram_pct, read_temp_c, read_uptime
 from .models import (
     ActionRequest,
+    DeviceTokenRegisterRequest,
+    DeviceTokenRevokeRequest,
     TotpCheckRequest,
     WebAuthnAuthenticateOptionsRequest,
     WebAuthnAuthenticateVerifyRequest,
@@ -76,6 +79,58 @@ def check_totp(payload: TotpCheckRequest, request: Request) -> dict[str, Any]:
         "serverTime": datetime.now(timezone.utc).isoformat(),
         "codeWindowSeconds": 30,
     }
+
+
+@router.get("/api/auth/devices", dependencies=protected)
+def auth_devices(request: Request) -> dict[str, Any]:
+    return {
+        "devices": list_device_tokens(),
+        "currentDeviceId": getattr(request.state, "auth_device_id", None),
+    }
+
+
+@router.post("/api/auth/devices/register", dependencies=protected)
+def auth_device_register(payload: DeviceTokenRegisterRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="device-token-register", limit=6, window_seconds=300)
+    if not verify_totp(payload.totpCode):
+        audit_event(
+            "device_token.registration",
+            "failure",
+            request=request,
+            details={"detail": "Invalid TOTP code"},
+        )
+        raise HTTPException(status_code=401, detail="Invalid TOTP code")
+    result = create_device_token(payload.deviceLabel, request)
+    audit_event(
+        "device_token.registration",
+        "success",
+        request=request,
+        details={"device_id": result["device"]["deviceId"], "device_label": result["device"]["deviceLabel"]},
+    )
+    return result
+
+
+@router.delete("/api/auth/devices/{device_id}", dependencies=protected)
+def auth_device_revoke(device_id: str, payload: DeviceTokenRevokeRequest, request: Request) -> dict[str, str]:
+    enforce_rate_limit(request, bucket="device-token-revoke", limit=5, window_seconds=300)
+    if not verify_totp(payload.totpCode):
+        audit_event(
+            "device_token.revocation",
+            "failure",
+            request=request,
+            details={"device_id": device_id, "detail": "Invalid TOTP code"},
+        )
+        raise HTTPException(status_code=401, detail="Invalid TOTP code")
+    if not revoke_device_token(device_id):
+        audit_event(
+            "device_token.revocation",
+            "failure",
+            request=request,
+            details={"device_id": device_id, "detail": "Unknown or already revoked device token"},
+        )
+        raise HTTPException(status_code=404, detail="Unknown or already revoked device token")
+    audit_event("device_token.revocation", "success", request=request, details={"device_id": device_id})
+    return {"status": "revoked"}
 
 
 @router.post("/api/auth/webauthn/register/options", dependencies=protected)

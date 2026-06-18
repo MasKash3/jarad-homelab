@@ -866,9 +866,18 @@ button {
   background: var(--surface-2);
 }
 
+.config-card.is-muted {
+  opacity: 0.68;
+}
+
 .config-card strong {
   display: block;
   margin-bottom: 3px;
+}
+
+.inline-muted {
+  color: var(--muted);
+  font-size: 0.85em;
 }
 
 .unlock-form,

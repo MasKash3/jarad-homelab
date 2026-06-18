@@ -32,7 +32,7 @@ function assertWebAuthnAvailable() {
   }
 }
 
-function defaultDeviceLabel() {
+export function defaultDeviceLabel() {
   const userAgent = navigator.userAgent || "";
   const platform = navigator.userAgentData?.platform || navigator.platform || "";
   const normalized = normalizeDevicePlatform(platform, userAgent);

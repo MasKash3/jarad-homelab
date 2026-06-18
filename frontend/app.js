@@ -1,7 +1,7 @@
 import { configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js';
 import { createNoDataState } from './js/empty-state.js';
 import { createApi } from './js/api.js';
-import { registerPasskey, verifyPasskeyForAction } from './js/auth.js';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js';
 import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js';
 
 let serviceFilter = "all";
@@ -14,6 +14,7 @@ let pendingService = null;
 let activeServiceId = null;
 let pendingAuth = null;
 let passkeyCredentials = [];
+let deviceTokens = [];
 let pendingTotpResolve = null;
 let state = createNoDataState();
 let connectionState = {
@@ -45,6 +46,10 @@ function readSettings() {
   } catch {
     return {};
   }
+}
+
+function writeSettings(settings) {
+  localStorage.setItem(storageKeys.settings, JSON.stringify(settings));
 }
 
 function hasAutoBackend() {
@@ -220,6 +225,15 @@ function renderConfig() {
       <button class="text-button" type="button" data-delete-passkey="${escapeAttr(credential.credentialId)}">Remove</button>
     </article>
   `).join("") || emptyState("No passkeys registered on this backend yet.");
+  $("#deviceTokenList").innerHTML = deviceTokens.map((device) => `
+    <article class="config-card ${device.revokedAt ? "is-muted" : ""}">
+      <div>
+        <strong>${escapeHtml(device.deviceLabel || "Registered device")}${device.isCurrent ? ` <span class="inline-muted">(current)</span>` : ""}</strong>
+        <p>${escapeHtml(device.revokedAt ? `Revoked ${formatUpdated(device.revokedAt)}` : device.lastUsedAt ? `Last used ${formatUpdated(device.lastUsedAt)}` : `Created ${formatUpdated(device.createdAt)}`)}</p>
+      </div>
+      ${device.revokedAt ? `<span class="pill warn">Revoked</span>` : `<button class="text-button" type="button" data-revoke-device="${escapeAttr(device.deviceId)}">Revoke</button>`}
+    </article>
+  `).join("") || emptyState("No per-device tokens registered yet.");
   $("#configList").innerHTML = configActions.map((item) => `
     <article class="config-card">
       <div>
@@ -235,6 +249,9 @@ function renderConfig() {
   });
   $$("[data-delete-passkey]").forEach((button) => {
     button.addEventListener("click", () => deletePasskey(button.dataset.deletePasskey));
+  });
+  $$("[data-revoke-device]").forEach((button) => {
+    button.addEventListener("click", () => revokeDeviceToken(button.dataset.revokeDevice));
   });
   renderAudit();
 }
@@ -578,6 +595,63 @@ async function refreshPasskeys() {
   renderConfig();
 }
 
+async function refreshDeviceTokens() {
+  try {
+    const payload = await api.listDevices();
+    deviceTokens = (payload.devices || []).map((device) => ({
+      ...device,
+      isCurrent: device.deviceId === payload.currentDeviceId
+    }));
+  } catch {
+    deviceTokens = [];
+  }
+  renderConfig();
+}
+
+async function registerThisDeviceToken() {
+  const button = $("#registerDeviceTokenButton");
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Registering...";
+  try {
+    const totpCode = await requestTotpForPasskeyManagement("Register Device", "Enter your TOTP code to create a revocable token for this device.");
+    if (!totpCode) {
+      throw new Error("TOTP is required to register this device.");
+    }
+    const result = await api.registerDeviceToken(defaultDeviceLabel().replace(/ passkey$/i, ""), totpCode);
+    const settings = readSettings();
+    writeSettings({
+      ...settings,
+      token: result.token
+    });
+    addAudit("Registered device token", "config", "success", result.device?.deviceLabel || "This device");
+    await refreshDeviceTokens();
+    renderSettings();
+    refreshState();
+  } catch (error) {
+    addAudit("Device token registration failed", "config", "failure", error.message);
+    $("#authMethodHelp").textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
+async function revokeDeviceToken(deviceId) {
+  try {
+    const totpCode = await requestTotpForPasskeyManagement("Revoke Device", "Enter your TOTP code to revoke this device token.");
+    if (!totpCode) {
+      throw new Error("TOTP is required to revoke a device token.");
+    }
+    await api.revokeDeviceToken(deviceId, totpCode);
+    addAudit("Revoked device token", "config", "success");
+    await refreshDeviceTokens();
+  } catch (error) {
+    addAudit("Device token revocation failed", "config", "failure", error.message);
+    $("#authMethodHelp").textContent = error.message;
+  }
+}
+
 async function registerThisDevicePasskey() {
   const button = $("#registerPasskeyButton");
   const originalText = button.textContent;
@@ -716,6 +790,7 @@ function bindEvents() {
     });
   });
   $("#registerPasskeyButton").addEventListener("click", registerThisDevicePasskey);
+  $("#registerDeviceTokenButton").addEventListener("click", registerThisDeviceToken);
 
   $("#clearAuditButton").addEventListener("click", () => {
     localStorage.removeItem(storageKeys.audit);
@@ -724,10 +799,10 @@ function bindEvents() {
 
   $("#settingsForm").addEventListener("submit", (event) => {
     event.preventDefault();
-    localStorage.setItem(storageKeys.settings, JSON.stringify({
+    writeSettings({
       baseUrl: $("#apiBaseInput").value.trim(),
       token: $("#apiTokenInput").value.trim()
-    }));
+    });
     addAudit("Saved settings", "backend", "success");
     $("#settingsSheet").close();
     refreshState();
@@ -742,3 +817,4 @@ migrateLegacyStorage();
 bindEvents();
 refreshState();
 refreshPasskeys();
+refreshDeviceTokens();

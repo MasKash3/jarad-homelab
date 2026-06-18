@@ -43,3 +43,12 @@ class WebAuthnAuthenticateVerifyRequest(BaseModel):
     actionId: str | None = None
     serviceId: str | None = None
     credential: dict
+
+
+class DeviceTokenRegisterRequest(BaseModel):
+    deviceLabel: str | None = None
+    totpCode: str
+
+
+class DeviceTokenRevokeRequest(BaseModel):
+    totpCode: str

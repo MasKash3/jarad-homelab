@@ -27,7 +27,7 @@ def audit_event(
         store.add_audit_event(
             event_type=_clamp(event_type, 80),
             outcome=_clamp(outcome, 24),
-            actor="shared-token",
+            actor=_actor(request),
             action_id=_clamp(action_id, 120),
             service_id=_clamp(service_id, 120),
             credential_id=_clamp(credential_id, 180),
@@ -46,6 +46,12 @@ def _client_addr(request: Request | None) -> str | None:
     if forwarded:
         return _clamp(forwarded.split(",", 1)[0].strip(), 80)
     return _clamp(request.client.host if request.client else None, 80)
+
+
+def _actor(request: Request | None) -> str:
+    if not request:
+        return "unknown"
+    return _clamp(getattr(request.state, "auth_actor", None), 120) or "unknown"
 
 
 def _safe_details(details: dict[str, Any]) -> dict[str, Any]:
