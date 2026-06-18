@@ -179,7 +179,10 @@ function renderLiveTailButton() {
 
 function renderAlerts() {
   const active = state.alerts.filter((alert) => alert.time === "Active").length;
+  const hasCritical = state.alerts.some((alert) => alert.time === "Active" && alert.state === "bad");
+  const hasWarning = state.alerts.some((alert) => alert.time === "Active" && alert.state === "warn");
   $("#activeAlertCount").textContent = `${active} active`;
+  $("#activeAlertCount").className = `pill ${hasCritical ? "bad" : hasWarning ? "warn" : "good"}`;
   $("#alertList").innerHTML = state.alerts.map((alert) => `
     <article class="alert-card ${escapeAttr(alert.state)}">
       <header>
