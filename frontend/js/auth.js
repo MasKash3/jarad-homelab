@@ -33,8 +33,30 @@ function assertWebAuthnAvailable() {
 }
 
 function defaultDeviceLabel() {
-  const platform = navigator.userAgentData?.platform || navigator.platform || "This device";
-  return `${platform} passkey`;
+  const userAgent = navigator.userAgent || "";
+  const platform = navigator.userAgentData?.platform || navigator.platform || "";
+  const normalized = normalizeDevicePlatform(platform, userAgent);
+  return `${normalized} passkey`;
+}
+
+function normalizeDevicePlatform(platform, userAgent) {
+  const value = `${platform} ${userAgent}`.toLowerCase();
+  if (value.includes("android")) {
+    return "Android";
+  }
+  if (value.includes("iphone") || value.includes("ipad") || value.includes("ios")) {
+    return "iOS";
+  }
+  if (value.includes("mac")) {
+    return "Mac";
+  }
+  if (value.includes("win")) {
+    return "Windows";
+  }
+  if (value.includes("linux")) {
+    return "Linux";
+  }
+  return platform || "This device";
 }
 
 function decodeCreationOptions(options) {
