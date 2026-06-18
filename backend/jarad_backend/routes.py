@@ -304,11 +304,33 @@ def mobile_state() -> dict[str, Any]:
     }
 
 
-@router.get("/api/services/{service_id}/logs", dependencies=protected)
-def service_logs(service_id: str, limit: int = Query(default=100, ge=1, le=500)) -> dict[str, Any]:
+@router.post("/api/services/{service_id}/logs", dependencies=protected)
+def service_logs(service_id: str, payload: ActionRequest, request: Request, limit: int = Query(default=100, ge=1, le=500)) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="sensitive-view", limit=12, window_seconds=60)
     service = SERVICES.get(service_id)
     if not service:
         raise HTTPException(status_code=404, detail="Unknown service")
+    action_id = f"view-logs-{service_id}"
+    try:
+        verify_action_auth(payload, action_id, service_id)
+    except HTTPException as exc:
+        audit_event(
+            action_auth_event_type((payload.authMethod or "").lower()),
+            "failure",
+            request=request,
+            action_id=action_id,
+            service_id=service_id,
+            details={"method": payload.authMethod or "missing", "status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise
+    audit_event(
+        "sensitive_view.logs",
+        "success",
+        request=request,
+        action_id=action_id,
+        service_id=service_id,
+        details={"method": payload.authMethod or "missing"},
+    )
     result = docker_logs(service["container"], limit)
     if not result:
         return {
@@ -343,11 +365,33 @@ def service_logs(service_id: str, limit: int = Query(default=100, ge=1, le=500))
     }
 
 
-@router.get("/api/services/{service_id}/diagnostics", dependencies=protected)
-def service_diagnostics(service_id: str) -> dict[str, Any]:
+@router.post("/api/services/{service_id}/diagnostics", dependencies=protected)
+def service_diagnostics(service_id: str, payload: ActionRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="sensitive-view", limit=12, window_seconds=60)
     service = next((item for item in build_services() if item["id"] == service_id), None)
     if not service:
         raise HTTPException(status_code=404, detail="Unknown service")
+    action_id = f"view-diagnostics-{service_id}"
+    try:
+        verify_action_auth(payload, action_id, service_id)
+    except HTTPException as exc:
+        audit_event(
+            action_auth_event_type((payload.authMethod or "").lower()),
+            "failure",
+            request=request,
+            action_id=action_id,
+            service_id=service_id,
+            details={"method": payload.authMethod or "missing", "status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise
+    audit_event(
+        "sensitive_view.diagnostics",
+        "success",
+        request=request,
+        action_id=action_id,
+        service_id=service_id,
+        details={"method": payload.authMethod or "missing"},
+    )
     return {
         "service": service_id,
         "checks": [

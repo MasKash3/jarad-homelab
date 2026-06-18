@@ -352,19 +352,9 @@ async function runServiceAction(serviceId, actionKind) {
   const action = serviceActions.find((item) => item.kind === actionKind);
   if (!service || !action) return;
 
-  if (action.kind === "logs") {
-    await loadServiceLogs(service);
-    return;
-  }
-
-  if (action.kind === "diagnostics") {
-    await loadServiceDiagnostics(service, $(`[data-service-action="diagnostics"][data-service-id="${service.id}"]`));
-    return;
-  }
-
   pendingService = service;
   pendingAction = {
-    id: `${action.kind}-${service.id}`,
+    id: actionIdForServiceAction(action.kind, service.id),
     title: `${action.title} ${service.name}`,
     target: service.container,
     detail: action.detail,
@@ -375,9 +365,15 @@ async function runServiceAction(serviceId, actionKind) {
   openAuthSheet();
 }
 
-async function loadServiceLogs(service) {
+function actionIdForServiceAction(actionKind, serviceId) {
+  if (actionKind === "logs") return `view-logs-${serviceId}`;
+  if (actionKind === "diagnostics") return `view-diagnostics-${serviceId}`;
+  return `${actionKind}-${serviceId}`;
+}
+
+async function loadServiceLogs(service, auth = {}) {
   try {
-    const payload = await api.getServiceLogs(service.id, 100);
+    const payload = await api.getServiceLogs(service.id, 100, auth);
     serviceLogRows = (payload.logs || []).map((log) => ({
       level: log.level || "info",
       service: service.id,
@@ -396,7 +392,7 @@ async function loadServiceLogs(service) {
   }
 }
 
-async function loadServiceDiagnostics(service, button) {
+async function loadServiceDiagnostics(service, button, auth = {}) {
   const label = button?.querySelector("[data-action-label]");
   const originalLabel = label?.textContent || "Run health checks";
   if (button) button.disabled = true;
@@ -404,7 +400,7 @@ async function loadServiceDiagnostics(service, button) {
   renderInlineNotice(`Running diagnostics for ${service.name}...`, "info");
 
   try {
-    const payload = await api.getServiceDiagnostics(service.id);
+    const payload = await api.getServiceDiagnostics(service.id, auth);
     const checks = payload.checks || [];
     service.diagnostics = checks.map((check) => [check.label, check.detail, check.state]);
     const list = $("#serviceDetailBody .diagnostic-list");
@@ -510,17 +506,29 @@ async function executePendingAction() {
   if (!pendingAction) return;
   const completedAction = pendingAction;
   const completedAuth = pendingAuth || {};
+  const completedService = pendingService;
 
   try {
-    await api.executeAction(completedAction, completedAuth);
-    state.logs.unshift({
-      level: "info",
-      service: "admin",
-      time: "Now",
-      message: `${completedAction.title} requested from mobile app`
-    });
-    await refreshState({ preserveServiceSheet: true });
-    renderInlineNotice(`${completedAction.title} completed. Status refreshed.`, "good");
+    let handledSensitiveView = false;
+    if (completedAction.kind === "logs" && completedService) {
+      await loadServiceLogs(completedService, completedAuth);
+      handledSensitiveView = true;
+    }
+    if (completedAction.kind === "diagnostics" && completedService) {
+      await loadServiceDiagnostics(completedService, null, completedAuth);
+      handledSensitiveView = true;
+    }
+    if (!handledSensitiveView) {
+      await api.executeAction(completedAction, completedAuth);
+      state.logs.unshift({
+        level: "info",
+        service: "admin",
+        time: "Now",
+        message: `${completedAction.title} requested from mobile app`
+      });
+      await refreshState({ preserveServiceSheet: true });
+      renderInlineNotice(`${completedAction.title} completed. Status refreshed.`, "good");
+    }
   } catch (error) {
     addAudit(completedAction.title, completedAction.target, "failure", error.message);
     renderInlineNotice(`Action failed: ${error.message}`);

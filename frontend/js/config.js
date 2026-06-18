@@ -1,4 +1,4 @@
-export const APP_VERSION = "2026.06.18.5";
+export const APP_VERSION = "2026.06.18.6";
 
 export const storageKeys = {
   audit: "jarad.audit",
@@ -15,8 +15,8 @@ export const legacyStorageKeys = {
 };
 
 export const serviceActions = [
-  { kind: "logs", title: "View Logs", detail: "Recent service output", icon: "icon-log", protected: false },
-  { kind: "diagnostics", title: "Diagnostics", detail: "Run health checks", icon: "icon-activity", protected: false },
+  { kind: "logs", title: "View Logs", detail: "Protected log access", icon: "icon-log", protected: true },
+  { kind: "diagnostics", title: "Diagnostics", detail: "Protected diagnostics", icon: "icon-activity", protected: true },
   { kind: "start", title: "Start", detail: "Protected Docker start", icon: "icon-power", protected: true },
   { kind: "restart", title: "Restart", detail: "Protected Docker restart", icon: "icon-refresh", protected: true },
   { kind: "stop", title: "Stop", detail: "Protected stop action", icon: "icon-power", protected: true, danger: true }

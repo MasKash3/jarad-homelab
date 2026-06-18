@@ -152,29 +152,29 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
       })
     });
   },
-  async getServiceLogs(serviceId, limit = 100) {
-    const currentSettings = effectiveSettings(settings);
-    if (!currentSettings.baseUrl) {
-      throw new Error("Backend is not configured");
-    }
-
-    const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}/api/services/${serviceId}/logs?limit=${limit}`, {
-      headers: currentSettings.token ? { Authorization: `Bearer ${currentSettings.token}` } : {}
+  async getServiceLogs(serviceId, limit = 100, auth = {}) {
+    return request(`/api/services/${serviceId}/logs?limit=${limit}`, {
+      method: "POST",
+      body: JSON.stringify({
+        source: "mobile-pwa",
+        serviceId,
+        authMethod: auth.method,
+        totpCode: auth.totpCode,
+        actionAuthToken: auth.actionAuthToken
+      })
     });
-    if (!response.ok) throw new Error(`Logs returned ${response.status}`);
-    return response.json();
   },
-  async getServiceDiagnostics(serviceId) {
-    const currentSettings = effectiveSettings(settings);
-    if (!currentSettings.baseUrl) {
-      throw new Error("Backend is not configured");
-    }
-
-    const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}/api/services/${serviceId}/diagnostics`, {
-      headers: currentSettings.token ? { Authorization: `Bearer ${currentSettings.token}` } : {}
+  async getServiceDiagnostics(serviceId, auth = {}) {
+    return request(`/api/services/${serviceId}/diagnostics`, {
+      method: "POST",
+      body: JSON.stringify({
+        source: "mobile-pwa",
+        serviceId,
+        authMethod: auth.method,
+        totpCode: auth.totpCode,
+        actionAuthToken: auth.actionAuthToken
+      })
     });
-    if (!response.ok) throw new Error(`Diagnostics returned ${response.status}`);
-    return response.json();
   }
 };
 
