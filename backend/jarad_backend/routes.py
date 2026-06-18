@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from .audit import audit_event
 from .auth import require_token, verify_action_auth, verify_totp
 from .config import LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
 from .docker import docker_action, docker_logs
@@ -63,6 +64,12 @@ def check_totp(payload: TotpCheckRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="totp-check", limit=6, window_seconds=60)
     configured = bool(TOTP_SECRET)
     valid = verify_totp(payload.code) if configured else False
+    audit_event(
+        "totp.check",
+        "success" if valid else "failure",
+        request=request,
+        details={"configured": configured},
+    )
     return {
         "configured": configured,
         "valid": valid,
@@ -74,15 +81,41 @@ def check_totp(payload: TotpCheckRequest, request: Request) -> dict[str, Any]:
 @router.post("/api/auth/webauthn/register/options", dependencies=protected)
 def webauthn_register_options(payload: WebAuthnRegisterOptionsRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="webauthn-register-options", limit=20, window_seconds=300)
-    require_credential_management_auth(payload.totpCode)
-    return begin_registration(payload.deviceLabel)
+    try:
+        require_credential_management_auth(payload.totpCode)
+        return begin_registration(payload.deviceLabel)
+    except HTTPException as exc:
+        audit_event(
+            "passkey.registration",
+            "failure",
+            request=request,
+            details={"stage": "options", "status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise
 
 
 @router.post("/api/auth/webauthn/register/verify", dependencies=protected)
 def webauthn_register_verify(payload: WebAuthnRegisterVerifyRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="webauthn-register-verify", limit=20, window_seconds=300)
-    require_credential_management_auth(payload.totpCode)
-    return finish_registration(payload.challengeId, payload.credential, payload.deviceLabel)
+    try:
+        require_credential_management_auth(payload.totpCode)
+        result = finish_registration(payload.challengeId, payload.credential, payload.deviceLabel)
+    except HTTPException as exc:
+        audit_event(
+            "passkey.registration",
+            "failure",
+            request=request,
+            details={"stage": "verify", "status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise
+    audit_event(
+        "passkey.registration",
+        "success",
+        request=request,
+        credential_id=result.get("credentialId"),
+        details={"device_label": result.get("deviceLabel", "This device")},
+    )
+    return result
 
 
 @router.get("/api/auth/webauthn/credentials", dependencies=protected)
@@ -93,26 +126,77 @@ def webauthn_credentials() -> dict[str, Any]:
 @router.delete("/api/auth/webauthn/credentials/{credential_id}", dependencies=protected)
 def webauthn_delete_credential(credential_id: str, payload: WebAuthnCredentialDeleteRequest, request: Request) -> dict[str, str]:
     enforce_rate_limit(request, bucket="webauthn-credential-delete", limit=5, window_seconds=300)
-    require_credential_management_auth(payload.totpCode)
-    remove_registered_credential(credential_id)
+    try:
+        require_credential_management_auth(payload.totpCode)
+        remove_registered_credential(credential_id)
+    except HTTPException as exc:
+        audit_event(
+            "passkey.removal",
+            "failure",
+            request=request,
+            credential_id=credential_id,
+            details={"status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise
+    audit_event("passkey.removal", "success", request=request, credential_id=credential_id)
     return {"status": "deleted"}
 
 
 @router.post("/api/auth/webauthn/authenticate/options", dependencies=protected)
 def webauthn_authenticate_options(payload: WebAuthnAuthenticateOptionsRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="webauthn-authenticate", limit=12, window_seconds=60)
-    return begin_authentication(payload.actionId, payload.serviceId)
+    try:
+        return begin_authentication(payload.actionId, payload.serviceId)
+    except HTTPException as exc:
+        audit_event(
+            "webauthn.authentication",
+            "failure",
+            request=request,
+            action_id=payload.actionId,
+            service_id=payload.serviceId,
+            details={"stage": "options", "status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise
 
 
 @router.post("/api/auth/webauthn/authenticate/verify", dependencies=protected)
 def webauthn_authenticate_verify(payload: WebAuthnAuthenticateVerifyRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="webauthn-authenticate", limit=12, window_seconds=60)
-    return finish_authentication(
-        challenge_id=payload.challengeId,
-        credential=payload.credential,
+    try:
+        result = finish_authentication(
+            challenge_id=payload.challengeId,
+            credential=payload.credential,
+            action_id=payload.actionId,
+            service_id=payload.serviceId,
+        )
+    except HTTPException as exc:
+        audit_event(
+            "webauthn.authentication",
+            "failure",
+            request=request,
+            action_id=payload.actionId,
+            service_id=payload.serviceId,
+            details={"stage": "verify", "status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise
+    audit_event(
+        "webauthn.authentication",
+        "success",
+        request=request,
         action_id=payload.actionId,
         service_id=payload.serviceId,
+        credential_id=result.get("credentialId"),
     )
+    if result.get("actionAuthToken"):
+        audit_event(
+            "action_token.created",
+            "success",
+            request=request,
+            action_id=payload.actionId,
+            service_id=payload.serviceId,
+            credential_id=result.get("credentialId"),
+        )
+    return result
 
 
 @router.get("/api/mobile/state", dependencies=protected)
@@ -228,12 +312,48 @@ def service_action(action_id: str, payload: ActionRequest, request: Request) -> 
         raise HTTPException(status_code=404, detail="Unknown service")
     if action not in {"start", "restart", "stop"}:
         raise HTTPException(status_code=400, detail="Unsupported action")
-    verify_action_auth(payload, action_id, service_id)
+    method = (payload.authMethod or "").lower()
+    try:
+        verify_action_auth(payload, action_id, service_id)
+    except HTTPException as exc:
+        audit_event(
+            action_auth_event_type(method),
+            "failure",
+            request=request,
+            action_id=action_id,
+            service_id=service_id,
+            details={"method": method or "missing", "status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise
+    audit_event(
+        action_auth_event_type(method),
+        "success",
+        request=request,
+        action_id=action_id,
+        service_id=service_id,
+        details={"method": method or "missing"},
+    )
 
     result = docker_action(action, service["container"])
     if not result or result.returncode != 0:
         detail = result.stderr.strip() if result else "Docker command unavailable"
+        audit_event(
+            "docker.action",
+            "failure",
+            request=request,
+            action_id=action_id,
+            service_id=service_id,
+            details={"action": action, "container": service["container"], "detail": detail},
+        )
         raise HTTPException(status_code=500, detail=detail)
+    audit_event(
+        "docker.action",
+        "success",
+        request=request,
+        action_id=action_id,
+        service_id=service_id,
+        details={"action": action, "container": service["container"]},
+    )
     refreshed = next((item for item in build_services() if item["id"] == service_id), None)
     return {
         "status": "accepted",
@@ -251,3 +371,11 @@ def split_action(action_id: str) -> tuple[str, str]:
         if action_id.startswith(prefix):
             return action, action_id.removeprefix(prefix)
     raise HTTPException(status_code=400, detail="Unsupported action id")
+
+
+def action_auth_event_type(method: str) -> str:
+    if method == "fingerprint":
+        return "action_token.consumed"
+    if method == "totp":
+        return "totp.action_auth"
+    return "action_auth"

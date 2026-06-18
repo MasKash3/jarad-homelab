@@ -79,6 +79,25 @@ class WebAuthnStore:
                 )
                 """
             )
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS audit_events (
+                    audit_id TEXT PRIMARY KEY,
+                    event_type TEXT NOT NULL,
+                    outcome TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    action_id TEXT,
+                    service_id TEXT,
+                    credential_id TEXT,
+                    remote_addr TEXT,
+                    user_agent TEXT,
+                    details_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            db.execute("CREATE INDEX IF NOT EXISTS idx_audit_events_created_at ON audit_events(created_at)")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_audit_events_event_type ON audit_events(event_type)")
 
     def create_challenge(
         self,
@@ -209,3 +228,43 @@ class WebAuthnStore:
                 return False
             db.execute("UPDATE action_authorizations SET used_at = ? WHERE token = ?", (iso(now), token))
             return True
+
+    def add_audit_event(
+        self,
+        *,
+        event_type: str,
+        outcome: str,
+        actor: str,
+        action_id: str | None = None,
+        service_id: str | None = None,
+        credential_id: str | None = None,
+        remote_addr: str | None = None,
+        user_agent: str | None = None,
+        details_json: str = "{}",
+    ) -> str:
+        audit_id = secrets.token_urlsafe(18)
+        with self.connect() as db:
+            db.execute(
+                """
+                INSERT INTO audit_events
+                    (
+                        audit_id, event_type, outcome, actor, action_id, service_id,
+                        credential_id, remote_addr, user_agent, details_json, created_at
+                    )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    audit_id,
+                    event_type,
+                    outcome,
+                    actor,
+                    action_id,
+                    service_id,
+                    credential_id,
+                    remote_addr,
+                    user_agent,
+                    details_json,
+                    iso(utc_now()),
+                ),
+            )
+        return audit_id
