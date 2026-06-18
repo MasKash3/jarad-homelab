@@ -926,8 +926,7 @@ button {
 .text-button:focus-visible,
 .icon-button:focus-visible,
 .action-button:focus-visible,
-.segmented button:focus-visible,
-.bottom-nav button:focus-visible {
+.segmented button:focus-visible {
   box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgba(33, 134, 255, .72);
 }
 
