@@ -7,6 +7,7 @@ import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHt
 let serviceFilter = "all";
 let logFilter = "all";
 let logContext = null;
+let serviceLogRows = [];
 let liveTail = false;
 let pendingAction = null;
 let pendingService = null;
@@ -148,7 +149,8 @@ function renderLogs() {
   $("#logsTitle").textContent = logContext ? `${logContext.name} Logs` : "Logs";
   $("#backToServicesButton").hidden = !logContext;
   const search = $("#logSearch").value.trim().toLowerCase();
-  const logs = state.logs.filter((log) => {
+  const sourceLogs = logContext ? serviceLogRows : state.logs;
+  const logs = sourceLogs.filter((log) => {
     const matchesFilter = logFilter === "all" || log.level === logFilter || log.service === logFilter;
     const matchesSearch = !search || `${log.service} ${log.message}`.toLowerCase().includes(search);
     return matchesFilter && matchesSearch;
@@ -351,7 +353,7 @@ async function runServiceAction(serviceId, actionKind) {
 async function loadServiceLogs(service) {
   try {
     const payload = await api.getServiceLogs(service.id, 100);
-    state.logs = (payload.logs || []).map((log) => ({
+    serviceLogRows = (payload.logs || []).map((log) => ({
       level: log.level || "info",
       service: service.id,
       time: log.time || "Recent",
@@ -513,6 +515,7 @@ function renderAuthError(message) {
 function setActiveScreen(screenName) {
   if (screenName !== "logs") {
     logContext = null;
+    serviceLogRows = [];
   }
   $$(".screen").forEach((screen) => screen.classList.toggle("is-active", screen.id === `screen-${screenName}`));
   $$(".bottom-nav [data-nav]").forEach((button) => button.classList.toggle("is-active", button.dataset.nav === screenName));
