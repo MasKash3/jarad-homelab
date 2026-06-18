@@ -73,14 +73,14 @@ def check_totp(payload: TotpCheckRequest, request: Request) -> dict[str, Any]:
 
 @router.post("/api/auth/webauthn/register/options", dependencies=protected)
 def webauthn_register_options(payload: WebAuthnRegisterOptionsRequest, request: Request) -> dict[str, Any]:
-    enforce_rate_limit(request, bucket="webauthn-register", limit=6, window_seconds=300)
+    enforce_rate_limit(request, bucket="webauthn-register-options", limit=20, window_seconds=300)
     require_credential_management_auth(payload.totpCode)
     return begin_registration(payload.deviceLabel)
 
 
 @router.post("/api/auth/webauthn/register/verify", dependencies=protected)
 def webauthn_register_verify(payload: WebAuthnRegisterVerifyRequest, request: Request) -> dict[str, Any]:
-    enforce_rate_limit(request, bucket="webauthn-register", limit=6, window_seconds=300)
+    enforce_rate_limit(request, bucket="webauthn-register-verify", limit=20, window_seconds=300)
     require_credential_management_auth(payload.totpCode)
     return finish_registration(payload.challengeId, payload.credential, payload.deviceLabel)
 
