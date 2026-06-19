@@ -382,7 +382,7 @@ async function loadServiceLogs(service, auth = {}) {
     }));
     logContext = { serviceId: service.id, name: service.name };
     $("#serviceSheet").close();
-    setActiveScreen("logs");
+    setActiveScreen("logs", { preserveLogContext: true });
     $("#logSearch").value = "";
     addAudit("Viewed logs", service.name, "success", "Fetched from backend");
     renderLogs();
@@ -545,8 +545,8 @@ function renderAuthError(message) {
   error.hidden = !message;
 }
 
-function setActiveScreen(screenName) {
-  if (screenName !== "logs") {
+function setActiveScreen(screenName, options = {}) {
+  if (screenName !== "logs" || !options.preserveLogContext) {
     logContext = null;
     serviceLogRows = [];
   }
