@@ -48,6 +48,7 @@ def build_services() -> list[dict[str, Any]]:
                 **meta,
                 "status": "unknown" if docker_unavailable else "running" if running else "stopped",
                 "health": health,
+                "uptime": service_uptime(docker_info["status"] if docker_info else None, running, docker_unavailable),
                 "restarts": docker_restarts(container) if docker_info else 0,
                 "cpu": round(float(stat.get("cpu", 0))),
                 "ram": memory,
@@ -58,6 +59,19 @@ def build_services() -> list[dict[str, Any]]:
         )
 
     return services
+
+
+def service_uptime(status: str | None, running: bool, docker_unavailable: bool) -> str:
+    if docker_unavailable:
+        return "Docker unavailable"
+    if not running:
+        return "Stopped"
+    if not status:
+        return "Running"
+    text = status.strip()
+    if text.lower().startswith("up "):
+        return text[3:]
+    return text
 
 
 def diagnostics_for(service_id: str, running: bool, health: str, docker_unavailable: bool) -> list[list[str]]:

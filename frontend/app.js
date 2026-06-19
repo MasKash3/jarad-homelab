@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.6';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.19.6';
-import { createApi } from './js/api.js?v=2026.06.19.6';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.6';
-import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.6';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.7';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.19.7';
+import { createApi } from './js/api.js?v=2026.06.19.7';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.7';
+import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.7';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -313,7 +313,7 @@ function openService(serviceId, options = {}) {
     </div>
     <div class="detail-grid">
       <div><span>Status</span><strong>${escapeHtml(service.status)}</strong></div>
-      <div><span>Uptime</span><strong>${escapeHtml(state.server.uptime)}</strong></div>
+      <div><span>Uptime</span><strong>${escapeHtml(service.uptime || service.status)}</strong></div>
       <div><span>Auto restarts</span><strong>${escapeHtml(service.restarts)}</strong></div>
       <div><span>Last issue</span><strong>${escapeHtml(service.lastError)}</strong></div>
     </div>
