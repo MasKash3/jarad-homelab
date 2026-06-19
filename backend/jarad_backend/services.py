@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import re
 import socket
+from datetime import datetime, timezone
 from typing import Any
 
 from .command import run_command
 from .config import BACKUP_LOG, DATA_MOUNT, DNS_SERVER, PUBLIC_HOST, SERVICES
-from .docker import docker_ps, docker_restarts, docker_stats
+from .docker import docker_ps, docker_restarts, docker_started_at, docker_stats
 from .logtail import tail_lines
 
 
@@ -21,6 +22,7 @@ def build_services() -> list[dict[str, Any]]:
         stat = stats.get(container, {})
         docker_unavailable = containers is None
         running = bool(docker_info and docker_info["status"].lower().startswith("up"))
+        started_at = docker_started_at(container) if docker_info and running else None
         health = "degraded" if docker_unavailable else "healthy" if running else "down"
         last_error = (
             "Docker unavailable"
@@ -49,7 +51,7 @@ def build_services() -> list[dict[str, Any]]:
                 **meta,
                 "status": "unknown" if docker_unavailable else "running" if running else "stopped",
                 "health": health,
-                "uptime": service_uptime(docker_info["status"] if docker_info else None, running, docker_unavailable),
+                "uptime": service_uptime(docker_info["status"] if docker_info else None, started_at, running, docker_unavailable),
                 "restarts": docker_restarts(container) if docker_info else 0,
                 "cpu": round(float(stat.get("cpu", 0))),
                 "ram": memory,
@@ -62,17 +64,46 @@ def build_services() -> list[dict[str, Any]]:
     return services
 
 
-def service_uptime(status: str | None, running: bool, docker_unavailable: bool) -> str:
+def service_uptime(status: str | None, started_at: str | None, running: bool, docker_unavailable: bool) -> str:
     if docker_unavailable:
         return "Docker unavailable"
     if not running:
         return "Stopped"
+    inspected_uptime = uptime_since(started_at)
+    if inspected_uptime:
+        return inspected_uptime
     if not status:
         return "Running"
     text = status.strip()
     if text.lower().startswith("up "):
         return text[3:]
     return text
+
+
+def uptime_since(started_at: str | None) -> str | None:
+    if not started_at:
+        return None
+
+    try:
+        raw = started_at.removesuffix("Z")
+        if "." in raw:
+            base, fraction = raw.split(".", 1)
+            raw = f"{base}.{fraction[:6]}"
+        started = datetime.fromisoformat(raw).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+    seconds = max(0, int((datetime.now(timezone.utc) - started).total_seconds()))
+    days = seconds // 86400
+    hours = (seconds % 86400) // 3600
+    minutes = (seconds % 3600) // 60
+    if days:
+        return f"{days} days, {hours} hours"
+    if hours:
+        return f"{hours} hours, {minutes} minutes"
+    if minutes:
+        return f"{minutes} minutes"
+    return "Just started"
 
 
 def diagnostics_for(service_id: str, running: bool, health: str, docker_unavailable: bool) -> list[list[str]]:

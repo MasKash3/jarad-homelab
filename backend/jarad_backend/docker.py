@@ -35,7 +35,12 @@ def docker_command(args: list[str], *, timeout: int) -> subprocess.CompletedProc
         ):
             return None
     elif command == "inspect":
-        if len(args) != 4 or args[1] != "-f" or args[2] != "{{.RestartCount}}" or not is_allowed_container(args[3]):
+        if (
+            len(args) != 4
+            or args[1] != "-f"
+            or args[2] not in {"{{.RestartCount}}", "{{.State.StartedAt}}"}
+            or not is_allowed_container(args[3])
+        ):
             return None
     elif command == "ps":
         if args != ["ps", "-a", "--format", "{{.Names}}\t{{.Status}}\t{{.Image}}"]:
@@ -109,6 +114,16 @@ def docker_restarts(container: str) -> int:
         return int(result.stdout.strip())
     except ValueError:
         return 0
+
+
+def docker_started_at(container: str) -> str | None:
+    result = docker_command(["inspect", "-f", "{{.State.StartedAt}}", container], timeout=4)
+    if not result or result.returncode != 0:
+        return None
+    value = result.stdout.strip()
+    if not value or value.startswith("0001-01-01"):
+        return None
+    return value
 
 
 def docker_logs(container: str, limit: int) -> tuple[int, str] | None:
