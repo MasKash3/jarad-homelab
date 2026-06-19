@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.8';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.19.8';
-import { createApi } from './js/api.js?v=2026.06.19.8';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.8';
-import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.8';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.9';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.19.9';
+import { createApi } from './js/api.js?v=2026.06.19.9';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.9';
+import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.9';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -74,6 +74,13 @@ function backupStateClass(value) {
   return "warn";
 }
 
+function raidStateClass(value) {
+  const text = String(value || "").toLowerCase();
+  if (text.includes("clean") || text.includes("healthy") || text.includes("ok")) return "good";
+  if (text.includes("degraded") || text.includes("failed") || text.includes("error")) return "bad";
+  return "warn";
+}
+
 function render() {
   renderAppVersion();
   renderDashboard();
@@ -111,7 +118,7 @@ function renderDashboard() {
     </article>
   `).join("") || noDataPanel("No Metrics", state.emptyReason || "Live server metrics are unavailable.");
   $("#raidState").textContent = state.storage.raid;
-  $("#raidState").className = `pill ${state.isEmpty ? "warn" : "good"}`;
+  $("#raidState").className = `pill ${state.isEmpty ? "warn" : raidStateClass(state.storage.raid)}`;
   $("#storageUsedBar").style.setProperty("--value", `${state.storage.usedPct}%`);
   $("#storageUsedBar").style.setProperty("--bar-color", colorForState(state.storage.usedPct > 80 ? "bad" : state.storage.usedPct > 65 ? "warn" : "good"));
   $("#storageLabel").textContent = state.storage.label;
