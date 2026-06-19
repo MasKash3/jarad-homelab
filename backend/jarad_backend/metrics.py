@@ -111,10 +111,14 @@ def format_backup_line(line: str | None, label: str) -> str:
     clean = line.strip("= ").strip()
     timestamp = clean.split(":", 1)[1].strip() if ":" in clean else clean
     match = re.search(
-        r"(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{1,2}:\d{2})",
+        r"(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{1,2})[:h](\d{2})",
         timestamp,
     )
     if match:
-        return f"{label} {match.group(2)} {match.group(3)} {match.group(4)}"
+        hour = int(match.group(4))
+        minute = match.group(5)
+        suffix = "AM" if hour < 12 else "PM"
+        hour_12 = hour % 12 or 12
+        return f"{label} {match.group(2)} {match.group(3)} {hour_12}:{minute} {suffix}"
 
     return f"{label} {timestamp[-24:] if len(timestamp) > 24 else timestamp}"
