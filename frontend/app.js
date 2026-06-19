@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.7';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.19.7';
-import { createApi } from './js/api.js?v=2026.06.19.7';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.7';
-import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.7';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.8';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.19.8';
+import { createApi } from './js/api.js?v=2026.06.19.8';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.8';
+import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.8';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -318,12 +318,13 @@ function openService(serviceId, options = {}) {
       <div><span>Last issue</span><strong>${escapeHtml(service.lastError)}</strong></div>
     </div>
     <h3 class="subhead">Quick Actions</h3>
+    <p class="action-auth-note">${escapeHtml(authMethodLabel())} required for all quick actions.</p>
     <div class="quick-actions">
       ${actionsForService(service).map((action) => `
         <button class="quick-action ${action.danger ? "danger" : ""}" type="button" data-service-action="${escapeAttr(action.kind)}" data-service-id="${escapeAttr(service.id)}">
           <svg><use href="#${escapeAttr(action.icon)}"></use></svg>
           <strong>${escapeHtml(action.title)}</strong>
-          <span data-action-label>${escapeHtml(action.protected ? `${authMethodLabel()} required` : action.detail)}</span>
+          <span data-action-label>${escapeHtml(action.detail)}</span>
         </button>
       `).join("")}
     </div>

@@ -562,6 +562,13 @@ button {
   color: var(--bad);
 }
 
+.action-auth-note {
+  margin: -4px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .service-list,
 .alert-list,
 .log-list,
