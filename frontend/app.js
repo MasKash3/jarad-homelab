@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.5';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.19.5';
-import { createApi } from './js/api.js?v=2026.06.19.5';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.5';
-import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.5';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.6';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.19.6';
+import { createApi } from './js/api.js?v=2026.06.19.6';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.6';
+import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.6';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -331,7 +331,7 @@ function openService(serviceId, options = {}) {
     <div class="resource-list">
       ${resourceRow("CPU Usage", service.resources.cpu, 100, "%", "good")}
       ${resourceRow("Memory Usage", service.resources.memory, service.resources.memoryLimit, "MB", "info")}
-      ${resourceRow("Container Disk", service.resources.disk, service.resources.diskLimit, "GB", service.resources.disk && service.resources.diskLimit && service.resources.disk / service.resources.diskLimit > .75 ? "warn" : "good")}
+      ${service.resources.disk !== null && service.resources.diskLimit ? resourceRow("Container Disk", service.resources.disk, service.resources.diskLimit, "GB", service.resources.disk / service.resources.diskLimit > .75 ? "warn" : "good") : ""}
     </div>
     <h3 class="subhead">Diagnostics</h3>
     <div class="diagnostic-list">
