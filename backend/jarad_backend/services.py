@@ -79,7 +79,7 @@ def diagnostics_for(service_id: str, running: bool, health: str, docker_unavaila
         ["Container", "Docker unavailable" if docker_unavailable else "Running" if running else "Stopped"],
         ["Health", health.title()],
         ["Restart policy", "Docker managed"],
-        ["Recent errors", "Docker CLI unavailable" if docker_unavailable else "None" if running else "Container unavailable"],
+        ["Recent errors", "Docker CLI unavailable" if docker_unavailable else "None" if running else "Service is stopped"],
     ]
     if service_id == "pihole":
         checks.insert(2, ["DNS test", "Pass" if dns_ok() else "Failed"])
