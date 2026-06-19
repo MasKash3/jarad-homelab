@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.4';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.19.4';
-import { createApi } from './js/api.js?v=2026.06.19.4';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.4';
-import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.4';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.5';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.19.5';
+import { createApi } from './js/api.js?v=2026.06.19.5';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.5';
+import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.5';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -133,6 +133,7 @@ function renderDashboard() {
 function renderServices() {
   const services = state.services.filter((service) => {
     if (serviceFilter === "all") return true;
+    if (serviceFilter === "healthy") return service.health === "healthy";
     if (serviceFilter === "degraded") return service.health === "degraded";
     if (serviceFilter === "down") return service.status !== "running" || service.health === "down";
     return true;
