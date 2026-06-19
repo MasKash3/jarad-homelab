@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.3';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.19.3';
-import { createApi } from './js/api.js?v=2026.06.19.3';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.3';
-import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.3';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.4';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.19.4';
+import { createApi } from './js/api.js?v=2026.06.19.4';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.4';
+import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.4';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -550,9 +550,13 @@ function renderAuthError(message) {
 }
 
 function setActiveScreen(screenName, options = {}) {
+  const shouldResetLogContext = screenName !== "logs" || !options.preserveLogContext;
   if (screenName !== "logs" || !options.preserveLogContext) {
     logContext = null;
     serviceLogRows = [];
+  }
+  if (shouldResetLogContext) {
+    renderLogs();
   }
   $$(".screen").forEach((screen) => screen.classList.toggle("is-active", screen.id === `screen-${screenName}`));
   $$(".bottom-nav [data-nav]").forEach((button) => button.classList.toggle("is-active", button.dataset.nav === screenName));
