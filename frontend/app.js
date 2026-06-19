@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.9';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.19.9';
-import { createApi } from './js/api.js?v=2026.06.19.9';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.9';
-import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.9';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.10';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.19.10';
+import { createApi } from './js/api.js?v=2026.06.19.10';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.10';
+import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.10';
 
 let serviceFilter = "all";
 let logFilter = "all";

@@ -563,10 +563,17 @@ button {
 }
 
 .action-auth-note {
-  margin: -4px 0 10px;
+  display: block;
+  margin: -4px 16px 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(33, 134, 255, .22);
+  border-radius: 7px;
+  background: rgba(33, 134, 255, .08);
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .service-list,
