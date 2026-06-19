@@ -28,7 +28,7 @@ def create_device_token(device_label: str | None, request: Request) -> dict[str,
 
 
 def list_device_tokens() -> list[dict[str, Any]]:
-    return [public_device(device) for device in store.list_device_tokens()]
+    return [public_device(device) for device in store.list_device_tokens(include_revoked=False)]
 
 
 def revoke_device_token(device_id: str) -> bool:

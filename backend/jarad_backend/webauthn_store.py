@@ -333,14 +333,16 @@ class WebAuthnStore:
             row = db.execute("SELECT 1 FROM device_tokens WHERE revoked_at IS NULL LIMIT 1").fetchone()
             return bool(row)
 
-    def list_device_tokens(self) -> list[dict[str, Any]]:
+    def list_device_tokens(self, include_revoked: bool = False) -> list[dict[str, Any]]:
+        where_clause = "" if include_revoked else "WHERE revoked_at IS NULL"
         with self.connect() as db:
             return [
                 dict(row)
                 for row in db.execute(
-                    """
+                    f"""
                     SELECT device_id, device_label, created_at, last_used_at, revoked_at, remote_addr, user_agent
                     FROM device_tokens
+                    {where_clause}
                     ORDER BY revoked_at IS NOT NULL, last_used_at DESC, created_at DESC
                     """
                 ).fetchall()
