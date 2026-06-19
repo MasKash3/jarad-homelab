@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.11';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.19.11';
-import { createApi } from './js/api.js?v=2026.06.19.11';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.11';
-import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.11';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.12';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.19.12';
+import { createApi } from './js/api.js?v=2026.06.19.12';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.12';
+import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.12';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -15,7 +15,7 @@ let activeServiceId = null;
 let pendingAuth = null;
 let passkeyCredentials = [];
 let deviceTokens = [];
-let deviceTokenMessage = "Register this browser for revocable API access.";
+let deviceTokenMessage = "";
 let deviceTokenMessageState = "muted";
 let pendingTotpResolve = null;
 let state = createNoDataState();
@@ -250,6 +250,7 @@ function renderConfig() {
     </article>
   `).join("") || emptyState("No per-device tokens registered yet.");
   $("#deviceTokenHelp").textContent = deviceTokenMessage;
+  $("#deviceTokenHelp").hidden = !deviceTokenMessage;
   $("#deviceTokenHelp").className = `config-help ${deviceTokenMessageState}`;
   $("#configList").innerHTML = configActions.map((item) => `
     <article class="config-card">
