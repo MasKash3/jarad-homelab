@@ -26,7 +26,13 @@ def docker_command(args: list[str], *, timeout: int) -> subprocess.CompletedProc
         if len(args) != 2 or not is_allowed_container(args[1]):
             return None
     elif command == "logs":
-        if len(args) != 4 or args[1] != "--tail" or not args[2].isdigit() or not is_allowed_container(args[3]):
+        if (
+            len(args) != 5
+            or args[1] != "--timestamps"
+            or args[2] != "--tail"
+            or not args[3].isdigit()
+            or not is_allowed_container(args[4])
+        ):
             return None
     elif command == "inspect":
         if len(args) != 4 or args[1] != "-f" or args[2] != "{{.RestartCount}}" or not is_allowed_container(args[3]):
@@ -106,7 +112,7 @@ def docker_restarts(container: str) -> int:
 
 
 def docker_logs(container: str, limit: int) -> tuple[int, str] | None:
-    result = docker_command(["logs", "--tail", str(limit), container], timeout=8)
+    result = docker_command(["logs", "--timestamps", "--tail", str(limit), container], timeout=8)
     if not result:
         return None
     combined = "\n".join(part for part in [result.stdout, result.stderr] if part.strip())

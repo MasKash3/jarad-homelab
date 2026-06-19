@@ -359,7 +359,7 @@ def service_logs(service_id: str, payload: ActionRequest, request: Request, limi
     return {
         "service": service_id,
         "logs": [
-            {"level": "error" if "error" in line.lower() else "info", "time": "Recent", "message": line}
+            service_log_row(line)
             for line in combined.splitlines()[-limit:]
         ],
     }
@@ -478,3 +478,33 @@ def action_auth_event_type(method: str) -> str:
     if method == "totp":
         return "totp.action_auth"
     return "action_auth"
+
+
+def service_log_row(line: str) -> dict[str, str]:
+    log_time, message = split_docker_log_line(line)
+    return {
+        "level": "error" if "error" in message.lower() else "info",
+        "time": log_time,
+        "message": message,
+    }
+
+
+def split_docker_log_line(line: str) -> tuple[str, str]:
+    raw_timestamp, separator, message = line.partition(" ")
+    if not separator or "T" not in raw_timestamp:
+        return "Recent", line
+
+    return format_docker_timestamp(raw_timestamp), message
+
+
+def format_docker_timestamp(raw_timestamp: str) -> str:
+    timestamp = raw_timestamp.removesuffix("Z")
+    if "." in timestamp:
+        base, fraction = timestamp.split(".", 1)
+        timestamp = f"{base}.{fraction[:6]}"
+    try:
+        parsed = datetime.fromisoformat(timestamp)
+    except ValueError:
+        return raw_timestamp[:19].replace("T", " ")
+
+    return f"{parsed.strftime('%b')} {parsed.day} {parsed.strftime('%H:%M')} UTC"
