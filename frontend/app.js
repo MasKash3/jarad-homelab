@@ -15,6 +15,8 @@ let activeServiceId = null;
 let pendingAuth = null;
 let passkeyCredentials = [];
 let deviceTokens = [];
+let deviceTokenMessage = "Register this browser for revocable API access.";
+let deviceTokenMessageState = "muted";
 let pendingTotpResolve = null;
 let state = createNoDataState();
 let connectionState = {
@@ -239,6 +241,8 @@ function renderConfig() {
       ${device.revokedAt ? `<span class="pill warn">Revoked</span>` : `<button class="text-button" type="button" data-revoke-device="${escapeAttr(device.deviceId)}">Revoke</button>`}
     </article>
   `).join("") || emptyState("No per-device tokens registered yet.");
+  $("#deviceTokenHelp").textContent = deviceTokenMessage;
+  $("#deviceTokenHelp").className = `config-help ${deviceTokenMessageState}`;
   $("#configList").innerHTML = configActions.map((item) => `
     <article class="config-card">
       <div>
@@ -627,23 +631,30 @@ async function registerThisDeviceToken() {
   button.disabled = true;
   button.textContent = "Registering...";
   try {
+    const settings = readSettings();
+    if (!settings.token) {
+      throw new Error("Open Backend settings and enter the bootstrap app token before registering this device.");
+    }
     const totpCode = await requestTotpForPasskeyManagement("Register Device", "Enter your TOTP code to create a revocable token for this device.");
     if (!totpCode) {
       throw new Error("TOTP is required to register this device.");
     }
     const result = await api.registerDeviceToken(defaultDeviceLabel().replace(/ passkey$/i, ""), totpCode);
-    const settings = readSettings();
     writeSettings({
       ...settings,
       token: result.token
     });
+    deviceTokenMessage = "This browser is registered with a revocable device token.";
+    deviceTokenMessageState = "good";
     addAudit("Registered device token", "config", "success", result.device?.deviceLabel || "This device");
     await refreshDeviceTokens();
     renderSettings();
     refreshState();
   } catch (error) {
+    deviceTokenMessage = error.message;
+    deviceTokenMessageState = "bad";
     addAudit("Device token registration failed", "config", "failure", error.message);
-    $("#authMethodHelp").textContent = error.message;
+    renderConfig();
   } finally {
     button.disabled = false;
     button.textContent = originalText;

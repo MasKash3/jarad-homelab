@@ -554,6 +554,14 @@ button {
   line-height: 1.35;
 }
 
+.config-help.good {
+  color: var(--good);
+}
+
+.config-help.bad {
+  color: var(--bad);
+}
+
 .service-list,
 .alert-list,
 .log-list,
