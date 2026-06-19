@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.12';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.19.12';
-import { createApi } from './js/api.js?v=2026.06.19.12';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.12';
-import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.12';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.13';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.19.13';
+import { createApi } from './js/api.js?v=2026.06.19.13';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.13';
+import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.13';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -629,10 +629,12 @@ async function refreshPasskeys() {
 async function refreshDeviceTokens() {
   try {
     const payload = await api.listDevices();
-    deviceTokens = (payload.devices || []).map((device) => ({
-      ...device,
-      isCurrent: device.deviceId === payload.currentDeviceId
-    }));
+    deviceTokens = (payload.devices || [])
+      .filter((device) => !device.revokedAt)
+      .map((device) => ({
+        ...device,
+        isCurrent: device.deviceId === payload.currentDeviceId
+      }));
   } catch {
     deviceTokens = [];
   }
