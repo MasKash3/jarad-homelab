@@ -8,9 +8,7 @@ export function resourceRow(label, value, max, unit, stateName) {
           <span>${safeLabel}</span>
           <strong>Unavailable</strong>
         </div>
-        <div class="mini-bar muted-bar">
-          <span style="--value:0%"></span>
-        </div>
+        <progress class="mini-bar muted" value="0" max="100">0%</progress>
       </div>
     `;
   }
@@ -21,11 +19,13 @@ export function resourceRow(label, value, max, unit, stateName) {
         <span>${safeLabel}</span>
         <strong>${escapeHtml(formatResource(value, max, safeUnit))}</strong>
       </div>
-      <div class="mini-bar" style="--bar-color:${colorForState(stateName)}">
-        <span style="--value:${pct}%"></span>
-      </div>
+      <progress class="mini-bar ${escapeAttr(toneClass(stateName))}" value="${pct}" max="100">${pct}%</progress>
     </div>
   `;
+}
+
+export function toneClass(stateName) {
+  return ["good", "warn", "bad", "info", "muted"].includes(stateName) ? stateName : "good";
 }
 
 export function formatResource(value, max, unit) {
@@ -78,6 +78,20 @@ export function labelForState(stateName) {
 
 export function colorForState(stateName) {
   return { good: "#138a53", warn: "#b7791f", bad: "#bd2b2b" }[stateName] || "#138a53";
+}
+
+export function serviceColorClass(serviceId) {
+  const id = String(serviceId || "").toLowerCase();
+  return [
+    "nextcloud",
+    "immich",
+    "jellyfin",
+    "portainer",
+    "pihole",
+    "dozzle",
+    "uptime-kuma",
+    "stirling-pdf"
+  ].includes(id) ? `app-color-${id}` : "app-color-default";
 }
 
 export function emptyState(message) {

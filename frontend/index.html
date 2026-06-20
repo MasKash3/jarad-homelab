@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#050b10">
     <title>Jarad</title>
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="stylesheet" href="styles.css?v=2026.06.20.1">
+    <link rel="stylesheet" href="styles.css?v=2026.06.20.2">
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true">
@@ -64,7 +64,7 @@
           <p class="eyebrow">Private network</p>
           <div class="brand-line">
             <h1>Jarad</h1>
-            <span class="version-chip" id="appVersion">v2026.06.20.1</span>
+            <span class="version-chip" id="appVersion">v2026.06.20.2</span>
           </div>
         </div>
         <div class="topbar-actions">
@@ -107,9 +107,7 @@
               <h3>Storage</h3>
               <span id="raidState" class="pill warn">Unavailable</span>
             </div>
-            <div class="storage-bar" aria-label="Data drive usage">
-              <span id="storageUsedBar"></span>
-            </div>
+            <progress class="storage-bar warn" id="storageUsedBar" value="0" max="100" aria-label="Data drive usage">0%</progress>
             <div class="split-row">
               <span id="storageLabel">No live storage data</span>
               <span id="cloudBackupLabel">Backup status unavailable</span>
@@ -373,7 +371,7 @@
       </form>
     </dialog>
 
-    <script src="js/error-handler.js?v=2026.06.20.1"></script>
-    <script src="app.js?v=2026.06.20.1" type="module"></script>
+    <script src="js/error-handler.js?v=2026.06.20.2"></script>
+    <script src="app.js?v=2026.06.20.2" type="module"></script>
   </body>
 </html>

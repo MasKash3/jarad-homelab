@@ -285,9 +285,23 @@ button {
   width: 72px;
   height: 72px;
   border-radius: 999px;
-  background:
-    radial-gradient(circle at center, var(--surface) 0 54%, transparent 55%),
-    conic-gradient(var(--good) 0 var(--score-progress, 0%), #26333e var(--score-progress, 0%) 100%);
+  border: 8px solid #26333e;
+  background: var(--surface);
+}
+
+.score-ring.good {
+  border-color: var(--good);
+  box-shadow: 0 0 18px rgba(32, 212, 122, .16);
+}
+
+.score-ring.warn {
+  border-color: var(--warn);
+  box-shadow: 0 0 18px rgba(247, 186, 47, .14);
+}
+
+.score-ring.bad {
+  border-color: var(--bad);
+  box-shadow: 0 0 18px rgba(255, 86, 86, .14);
 }
 
 .score-ring span {
@@ -331,19 +345,57 @@ button {
 
 .mini-bar,
 .storage-bar {
+  display: block;
+  width: 100%;
   height: 8px;
   overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: #24313b;
+  appearance: none;
+}
+
+.mini-bar::-webkit-progress-bar,
+.storage-bar::-webkit-progress-bar {
   border-radius: 999px;
   background: #24313b;
 }
 
-.mini-bar span,
-.storage-bar span {
-  display: block;
-  height: 100%;
-  width: var(--value, 0%);
-  border-radius: inherit;
-  background: var(--bar-color, var(--good));
+.mini-bar::-webkit-progress-value,
+.storage-bar::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--bar-fill, var(--good));
+}
+
+.mini-bar::-moz-progress-bar,
+.storage-bar::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--bar-fill, var(--good));
+}
+
+.mini-bar.good,
+.storage-bar.good {
+  --bar-fill: var(--good);
+}
+
+.mini-bar.warn,
+.storage-bar.warn {
+  --bar-fill: var(--warn);
+}
+
+.mini-bar.bad,
+.storage-bar.bad {
+  --bar-fill: var(--bad);
+}
+
+.mini-bar.info,
+.storage-bar.info {
+  --bar-fill: var(--info);
+}
+
+.mini-bar.muted,
+.storage-bar.muted {
+  --bar-fill: var(--line);
 }
 
 .panel {
@@ -626,6 +678,42 @@ button {
   font-weight: 900;
 }
 
+.app-color-nextcloud {
+  --app-color: #2563a6;
+}
+
+.app-color-immich {
+  --app-color: #0f766e;
+}
+
+.app-color-jellyfin {
+  --app-color: #7c3aed;
+}
+
+.app-color-portainer {
+  --app-color: #0ea5e9;
+}
+
+.app-color-pihole {
+  --app-color: #dc2626;
+}
+
+.app-color-dozzle {
+  --app-color: #334155;
+}
+
+.app-color-uptime-kuma {
+  --app-color: #16a34a;
+}
+
+.app-color-stirling-pdf {
+  --app-color: #ca8a04;
+}
+
+.app-color-default {
+  --app-color: #138a53;
+}
+
 .service-icon.large {
   width: 54px;
   height: 54px;
@@ -747,10 +835,6 @@ button {
 
 .resource-row strong {
   font-size: 12px;
-}
-
-.muted-bar span {
-  background: var(--line);
 }
 
 .inline-notice {

@@ -3,7 +3,7 @@ __TAILSCALE_DOMAIN__:__APP_PORT__ {
     tls /certs/__TAILSCALE_DOMAIN__.crt /certs/__TAILSCALE_DOMAIN__.key
 
     header {
-        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
         Referrer-Policy "no-referrer"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"

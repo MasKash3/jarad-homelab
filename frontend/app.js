@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.1';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.20.1';
-import { createApi } from './js/api.js?v=2026.06.20.1';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.1';
-import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.20.1';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.2';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.20.2';
+import { createApi } from './js/api.js?v=2026.06.20.2';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.2';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.20.2';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -74,6 +74,10 @@ function backupStateClass(value) {
   return "warn";
 }
 
+function percentValue(value) {
+  return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+}
+
 function raidStateClass(value) {
   const text = String(value || "").toLowerCase();
   if (text.includes("clean") || text.includes("healthy") || text.includes("ok")) return "good";
@@ -103,8 +107,9 @@ function renderDashboard() {
   $("#lastUpdated").textContent = state.isEmpty ? "No live update" : `Updated ${formatUpdated(state.updatedAt)}`;
   $("#dashboardKicker").textContent = state.isEmpty ? "Connection" : "Server uptime";
   $("#dashboardTitle").textContent = state.server.uptime;
+  const healthScore = percentValue(state.server.healthScore);
   $("#healthScore").textContent = state.server.healthScore;
-  $(".score-ring").style.setProperty("--score-progress", `${Math.max(0, Math.min(100, Number(state.server.healthScore) || 0))}%`);
+  $(".score-ring").className = `score-ring ${healthScore >= 80 ? "good" : healthScore >= 60 ? "warn" : "bad"}`;
   $("#metricGrid").innerHTML = state.metrics.map((metric) => `
     <article class="metric">
       <div class="metric-top">
@@ -112,15 +117,15 @@ function renderDashboard() {
         <span class="pill ${escapeAttr(metric.state)}">${escapeHtml(metric.badge || labelForState(metric.state))}</span>
       </div>
       <strong>${escapeHtml(metric.value)}${escapeHtml(metric.unit)}</strong>
-      <div class="mini-bar" style="--bar-color:${colorForState(metric.state)}">
-        <span style="--value:${Number(metric.value) || 0}%"></span>
-      </div>
+      <progress class="mini-bar ${escapeAttr(toneClass(metric.state))}" value="${percentValue(metric.value)}" max="100">${percentValue(metric.value)}%</progress>
     </article>
   `).join("") || noDataPanel("No Metrics", state.emptyReason || "Live server metrics are unavailable.");
   $("#raidState").textContent = state.storage.raid;
   $("#raidState").className = `pill ${state.isEmpty ? "warn" : raidStateClass(state.storage.raid)}`;
-  $("#storageUsedBar").style.setProperty("--value", `${state.storage.usedPct}%`);
-  $("#storageUsedBar").style.setProperty("--bar-color", colorForState(state.storage.usedPct > 80 ? "bad" : state.storage.usedPct > 65 ? "warn" : "good"));
+  const storageUsed = percentValue(state.storage.usedPct);
+  $("#storageUsedBar").value = storageUsed;
+  $("#storageUsedBar").textContent = `${storageUsed}%`;
+  $("#storageUsedBar").className = `storage-bar ${storageUsed > 80 ? "bad" : storageUsed > 65 ? "warn" : "good"}`;
   $("#storageLabel").textContent = state.storage.label;
   $("#cloudBackupLabel").textContent = state.storage.cloudBackup;
   $("#backupState").textContent = state.backups.state;
@@ -130,7 +135,7 @@ function renderDashboard() {
   $("#nextBackup").textContent = state.backups.next;
 
   $("#launcherGrid").innerHTML = state.services.map((service) => `
-    <a class="launcher" href="${escapeAttr(safeUrl(service.url))}" target="_blank" rel="noreferrer" style="--app-color:${safeCssColor(service.color)}">
+    <a class="launcher ${escapeAttr(serviceColorClass(service.id))}" href="${escapeAttr(safeUrl(service.url))}" target="_blank" rel="noreferrer">
       <b>${escapeHtml(service.icon)}</b>
       <span>${escapeHtml(service.name)}</span>
     </a>
@@ -148,7 +153,7 @@ function renderServices() {
 
   $("#serviceList").innerHTML = services.map((service) => `
     <button class="service-card" type="button" data-service-id="${escapeAttr(service.id)}">
-      <span class="service-icon" style="--app-color:${safeCssColor(service.color)}">${escapeHtml(service.icon)}</span>
+      <span class="service-icon ${escapeAttr(serviceColorClass(service.id))}">${escapeHtml(service.icon)}</span>
       <div>
         <h3>${escapeHtml(service.name)}</h3>
         <p>${escapeHtml(service.container)}</p>
@@ -312,7 +317,7 @@ function openService(serviceId, options = {}) {
   $("#sheetServiceType").textContent = service.container;
   $("#serviceDetailBody").innerHTML = `
     <div class="service-detail-hero">
-      <span class="service-icon large" style="--app-color:${safeCssColor(service.color)}">${escapeHtml(service.icon)}</span>
+      <span class="service-icon large ${escapeAttr(serviceColorClass(service.id))}">${escapeHtml(service.icon)}</span>
       <div>
         <h3>${escapeHtml(service.name)}</h3>
         <p>${escapeHtml(service.image)}</p>
