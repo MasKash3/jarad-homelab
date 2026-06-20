@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#050b10">
     <title>Jarad</title>
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="stylesheet" href="styles.css?v=2026.06.20.2">
+    <link rel="stylesheet" href="styles.css?v=2026.06.20.3">
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true">
@@ -64,7 +64,7 @@
           <p class="eyebrow">Private network</p>
           <div class="brand-line">
             <h1>Jarad</h1>
-            <span class="version-chip" id="appVersion">v2026.06.20.2</span>
+            <span class="version-chip" id="appVersion">v2026.06.20.3</span>
           </div>
         </div>
         <div class="topbar-actions">
@@ -361,8 +361,9 @@
       <form class="settings-form" id="settingsForm">
         <label>
           <span>FastAPI base URL</span>
-          <input id="apiBaseInput" type="url" placeholder="Leave blank on the Tailscale Caddy URL">
+          <input id="apiBaseInput" type="url" placeholder="Leave blank to use this HTTPS origin">
         </label>
+        <p class="config-help bad" id="settingsError" role="alert" hidden></p>
         <label>
           <span>Access token</span>
           <input id="apiTokenInput" type="password" placeholder="Stored on this device">
@@ -371,7 +372,7 @@
       </form>
     </dialog>
 
-    <script src="js/error-handler.js?v=2026.06.20.2"></script>
-    <script src="app.js?v=2026.06.20.2" type="module"></script>
+    <script src="js/error-handler.js?v=2026.06.20.3"></script>
+    <script src="app.js?v=2026.06.20.3" type="module"></script>
   </body>
 </html>

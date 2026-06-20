@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.2';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.20.2';
-import { createApi } from './js/api.js?v=2026.06.20.2';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.2';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.20.2';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.3';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.20.3';
+import { createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.20.3';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.3';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.20.3';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -52,6 +52,12 @@ function readSettings() {
 
 function writeSettings(settings) {
   localStorage.setItem(storageKeys.settings, JSON.stringify(settings));
+}
+
+function renderSettingsError(message = "") {
+  const error = $("#settingsError");
+  error.textContent = message;
+  error.hidden = !message;
 }
 
 function hasAutoBackend() {
@@ -296,6 +302,8 @@ function renderSettings() {
   const settings = readSettings();
   $("#apiBaseInput").value = settings.baseUrl || "";
   $("#apiTokenInput").value = settings.token || "";
+  const validation = validateBackendBaseUrl(settings.baseUrl);
+  renderSettingsError(validation.ok ? "" : `${validation.message} The app is using this HTTPS origin instead.`);
 }
 
 function actionsForService(service) {
@@ -844,14 +852,21 @@ function bindEvents() {
 
   $("#settingsForm").addEventListener("submit", (event) => {
     event.preventDefault();
+    const baseUrlValidation = validateBackendBaseUrl($("#apiBaseInput").value);
+    if (!baseUrlValidation.ok) {
+      renderSettingsError(baseUrlValidation.message);
+      addAudit("Rejected backend URL", "backend", "warning", baseUrlValidation.message);
+      return;
+    }
     writeSettings({
-      baseUrl: $("#apiBaseInput").value.trim(),
+      baseUrl: baseUrlValidation.baseUrl,
       token: $("#apiTokenInput").value.trim()
     });
     addAudit("Saved settings", "backend", "success");
     $("#settingsSheet").close();
     refreshState();
   });
+  $("#apiBaseInput").addEventListener("input", () => renderSettingsError(""));
 }
 
 if ("serviceWorker" in navigator) {

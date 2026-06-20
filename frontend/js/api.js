@@ -1,16 +1,52 @@
 import { createNoDataState } from './empty-state.js';
 
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
+
+export function isProductionFrontend() {
+  return window.location.protocol === "https:" && !LOCAL_HOSTNAMES.has(window.location.hostname);
+}
+
 function defaultBaseUrl() {
   const isTailscaleHttps = window.location.protocol === "https:" && window.location.hostname.endsWith(".ts.net");
-  const isHttpsCustomDomain = window.location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(window.location.hostname);
+  const isHttpsCustomDomain = isProductionFrontend();
   return isTailscaleHttps || isHttpsCustomDomain ? window.location.origin : "";
+}
+
+export function validateBackendBaseUrl(baseUrl) {
+  const rawBaseUrl = String(baseUrl || "").trim();
+  if (!rawBaseUrl) {
+    return { ok: true, baseUrl: "" };
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(rawBaseUrl, window.location.origin);
+  } catch {
+    return { ok: false, message: "Enter a valid backend URL." };
+  }
+
+  if (isProductionFrontend()) {
+    if (parsedUrl.protocol !== "https:" || parsedUrl.origin !== window.location.origin) {
+      return {
+        ok: false,
+        message: "Production uses the same HTTPS origin for the backend. Leave this blank unless you are on a local dev page."
+      };
+    }
+  }
+
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    return { ok: false, message: "Backend URL must use HTTP or HTTPS." };
+  }
+
+  return { ok: true, baseUrl: parsedUrl.href.replace(/\/$/, "") };
 }
 
 function effectiveSettings(settings) {
   const currentSettings = settings();
+  const validation = validateBackendBaseUrl(currentSettings.baseUrl);
   return {
     ...currentSettings,
-    baseUrl: currentSettings.baseUrl || defaultBaseUrl()
+    baseUrl: validation.ok && validation.baseUrl ? validation.baseUrl : defaultBaseUrl()
   };
 }
 
