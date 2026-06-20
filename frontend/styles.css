@@ -1003,6 +1003,34 @@ button {
   margin-bottom: 3px;
 }
 
+.device-token-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+}
+
+.device-token-actions .text-button {
+  min-width: 74px;
+}
+
+@media (max-width: 520px) {
+  .device-token-card {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .device-token-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .device-token-actions .text-button {
+    flex: 1;
+    min-height: 42px;
+  }
+}
+
 .inline-muted {
   color: var(--muted);
   font-size: 0.85em;

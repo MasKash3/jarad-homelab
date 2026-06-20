@@ -57,6 +57,19 @@ export function formatUpdated(value) {
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+export function formatFuture(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  const seconds = Math.max(0, Math.round((date.getTime() - Date.now()) / 1000));
+  if (seconds < 60) return "in less than 1m";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `in ${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `in ${hours}h`;
+  const days = Math.round(hours / 24);
+  if (days < 90) return `in ${days}d`;
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
 export function stateClass(service) {
   if (service.status !== "running" || service.health === "down") return "bad";
   if (service.health === "degraded") return "warn";

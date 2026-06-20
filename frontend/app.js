@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.5';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.20.5';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.20.5';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.5';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.20.5';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.6';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.20.6';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.20.6';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.6';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.20.6';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -258,16 +258,18 @@ function renderConfig() {
   $("#deviceTokenList").innerHTML = deviceTokens.map((device) => {
     const deviceStatus = device.revokedAt
       ? `Revoked ${formatUpdated(device.revokedAt)}`
-      : `${device.lastUsedAt ? `Last used ${formatUpdated(device.lastUsedAt)}` : `Created ${formatUpdated(device.createdAt)}`}${device.expiresAt ? `; expires ${formatUpdated(device.expiresAt)}` : ""}`;
+      : `${device.lastUsedAt ? `Last used ${formatUpdated(device.lastUsedAt)}` : `Created ${formatUpdated(device.createdAt)}`}${device.expiresAt ? `; expires ${formatFuture(device.expiresAt)}` : ""}`;
     return `
-    <article class="config-card ${device.revokedAt ? "is-muted" : ""}">
+    <article class="config-card device-token-card ${device.revokedAt ? "is-muted" : ""}">
       <div>
         <strong>${escapeHtml(device.deviceLabel || "Registered device")}${device.isCurrent ? ` <span class="inline-muted">(current)</span>` : ""}</strong>
         <p>${escapeHtml(deviceStatus)}</p>
       </div>
       ${device.revokedAt ? `<span class="pill warn">Revoked</span>` : `
-        ${device.isCurrent ? `<button class="text-button" type="button" data-rotate-device>Rotate</button>` : ""}
-        <button class="text-button" type="button" data-revoke-device="${escapeAttr(device.deviceId)}">Revoke</button>
+        <div class="device-token-actions">
+          ${device.isCurrent ? `<button class="text-button" type="button" data-rotate-device>Rotate</button>` : ""}
+          <button class="text-button" type="button" data-revoke-device="${escapeAttr(device.deviceId)}">Revoke</button>
+        </div>
       `}
     </article>
   `;
