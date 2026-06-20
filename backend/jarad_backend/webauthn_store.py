@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from .config import DB_PATH
+from .config import DB_PATH, DEVICE_TOKEN_TTL_DAYS
 
 
 CHALLENGE_TTL_SECONDS = 180
@@ -107,13 +107,28 @@ class WebAuthnStore:
                     created_at TEXT NOT NULL,
                     last_used_at TEXT,
                     revoked_at TEXT,
+                    expires_at TEXT,
+                    rotated_at TEXT,
                     remote_addr TEXT,
                     user_agent TEXT
                 )
                 """
             )
+            self.ensure_device_token_columns(db)
             db.execute("CREATE INDEX IF NOT EXISTS idx_device_tokens_token_hash ON device_tokens(token_hash)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_device_tokens_created_at ON device_tokens(created_at)")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_device_tokens_expires_at ON device_tokens(expires_at)")
+
+    def ensure_device_token_columns(self, db: sqlite3.Connection) -> None:
+        columns = {row["name"] for row in db.execute("PRAGMA table_info(device_tokens)").fetchall()}
+        now = utc_now()
+        default_expiry = iso(now + timedelta(days=DEVICE_TOKEN_TTL_DAYS))
+        if "expires_at" not in columns:
+            db.execute("ALTER TABLE device_tokens ADD COLUMN expires_at TEXT")
+            db.execute("UPDATE device_tokens SET expires_at = ? WHERE expires_at IS NULL", (default_expiry,))
+        if "rotated_at" not in columns:
+            db.execute("ALTER TABLE device_tokens ADD COLUMN rotated_at TEXT")
+        db.execute("UPDATE device_tokens SET expires_at = ? WHERE expires_at IS NULL", (default_expiry,))
 
     def create_challenge(
         self,
@@ -293,16 +308,18 @@ class WebAuthnStore:
         remote_addr: str | None = None,
         user_agent: str | None = None,
     ) -> dict[str, Any]:
-        now = iso(utc_now())
+        now_dt = utc_now()
+        now = iso(now_dt)
+        expires_at = iso(now_dt + timedelta(days=DEVICE_TOKEN_TTL_DAYS))
         device_id = secrets.token_urlsafe(18)
         with self.connect() as db:
             db.execute(
                 """
                 INSERT INTO device_tokens
-                    (device_id, token_hash, device_label, created_at, remote_addr, user_agent)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (device_id, token_hash, device_label, created_at, expires_at, remote_addr, user_agent)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (device_id, token_hash, device_label, now, remote_addr, user_agent),
+                (device_id, token_hash, device_label, now, expires_at, remote_addr, user_agent),
             )
         return {
             "device_id": device_id,
@@ -310,41 +327,52 @@ class WebAuthnStore:
             "created_at": now,
             "last_used_at": None,
             "revoked_at": None,
+            "expires_at": expires_at,
+            "rotated_at": None,
             "remote_addr": remote_addr,
             "user_agent": user_agent,
         }
 
     def get_active_device_token(self, token_hash: str) -> dict[str, Any] | None:
+        now = utc_now()
         with self.connect() as db:
             row = db.execute(
                 """
                 SELECT * FROM device_tokens
-                WHERE token_hash = ? AND revoked_at IS NULL
+                WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ?
                 """,
-                (token_hash,),
+                (token_hash, iso(now)),
             ).fetchone()
             if not row:
                 return None
-            db.execute("UPDATE device_tokens SET last_used_at = ? WHERE device_id = ?", (iso(utc_now()), row["device_id"]))
+            db.execute("UPDATE device_tokens SET last_used_at = ? WHERE device_id = ?", (iso(now), row["device_id"]))
             return dict(row)
 
     def has_active_device_tokens(self) -> bool:
+        now = iso(utc_now())
         with self.connect() as db:
-            row = db.execute("SELECT 1 FROM device_tokens WHERE revoked_at IS NULL LIMIT 1").fetchone()
+            row = db.execute(
+                "SELECT 1 FROM device_tokens WHERE revoked_at IS NULL AND expires_at > ? LIMIT 1",
+                (now,),
+            ).fetchone()
             return bool(row)
 
     def list_device_tokens(self, include_revoked: bool = False) -> list[dict[str, Any]]:
-        where_clause = "" if include_revoked else "WHERE revoked_at IS NULL"
+        where_clause = "" if include_revoked else "WHERE revoked_at IS NULL AND expires_at > ?"
+        params: tuple[Any, ...] = () if include_revoked else (iso(utc_now()),)
         with self.connect() as db:
             return [
                 dict(row)
                 for row in db.execute(
                     f"""
-                    SELECT device_id, device_label, created_at, last_used_at, revoked_at, remote_addr, user_agent
+                    SELECT
+                        device_id, device_label, created_at, last_used_at,
+                        revoked_at, expires_at, rotated_at, remote_addr, user_agent
                     FROM device_tokens
                     {where_clause}
                     ORDER BY revoked_at IS NOT NULL, last_used_at DESC, created_at DESC
-                    """
+                    """,
+                    params,
                 ).fetchall()
             ]
 
@@ -359,3 +387,61 @@ class WebAuthnStore:
                 (iso(utc_now()), device_id),
             )
             return result.rowcount > 0
+
+    def rotate_device_token(
+        self,
+        *,
+        device_id: str,
+        token_hash: str,
+        remote_addr: str | None = None,
+        user_agent: str | None = None,
+    ) -> dict[str, Any] | None:
+        now_dt = utc_now()
+        now = iso(now_dt)
+        expires_at = iso(now_dt + timedelta(days=DEVICE_TOKEN_TTL_DAYS))
+        new_device_id = secrets.token_urlsafe(18)
+        with self.connect() as db:
+            current = db.execute(
+                """
+                SELECT * FROM device_tokens
+                WHERE device_id = ? AND revoked_at IS NULL AND expires_at > ?
+                """,
+                (device_id, now),
+            ).fetchone()
+            if not current:
+                return None
+            db.execute(
+                """
+                UPDATE device_tokens
+                SET revoked_at = ?, rotated_at = ?
+                WHERE device_id = ? AND revoked_at IS NULL
+                """,
+                (now, now, device_id),
+            )
+            db.execute(
+                """
+                INSERT INTO device_tokens
+                    (device_id, token_hash, device_label, created_at, expires_at, remote_addr, user_agent)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    new_device_id,
+                    token_hash,
+                    current["device_label"],
+                    now,
+                    expires_at,
+                    remote_addr,
+                    user_agent,
+                ),
+            )
+        return {
+            "device_id": new_device_id,
+            "device_label": current["device_label"],
+            "created_at": now,
+            "last_used_at": None,
+            "revoked_at": None,
+            "expires_at": expires_at,
+            "rotated_at": None,
+            "remote_addr": remote_addr,
+            "user_agent": user_agent,
+        }

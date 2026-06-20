@@ -10,13 +10,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from .audit import audit_event
 from .auth import require_token, verify_action_auth, verify_totp_for_actor
 from .config import ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP, LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
-from .device_tokens import create_device_token, list_device_tokens, revoke_device_token
+from .device_tokens import create_device_token, list_device_tokens, revoke_device_token, rotate_device_token
 from .docker import docker_action, docker_logs
 from .metrics import read_backup_state, read_cpu_pct, read_disk, read_raid_state, read_ram_pct, read_temp_c, read_uptime
 from .models import (
     ActionRequest,
     DeviceTokenRegisterRequest,
     DeviceTokenRevokeRequest,
+    DeviceTokenRotateRequest,
     TotpCheckRequest,
     WebAuthnAuthenticateOptionsRequest,
     WebAuthnAuthenticateVerifyRequest,
@@ -138,6 +139,49 @@ def auth_device_revoke(device_id: str, payload: DeviceTokenRevokeRequest, reques
         raise HTTPException(status_code=404, detail="Unknown or already revoked device token")
     audit_event("device_token.revocation", "success", request=request, details={"device_id": device_id})
     return {"status": "revoked"}
+
+
+@router.post("/api/auth/devices/current/rotate", dependencies=protected)
+def auth_device_rotate(payload: DeviceTokenRotateRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="device-token-rotate", limit=5, window_seconds=300)
+    device_id = getattr(request.state, "auth_device_id", None)
+    if not device_id:
+        audit_event(
+            "device_token.rotation",
+            "failure",
+            request=request,
+            details={"detail": "Device token is required for rotation"},
+        )
+        raise HTTPException(status_code=403, detail="Use a registered device token before rotating it")
+    if not verify_totp_for_actor(payload.totpCode, request, consume=True):
+        audit_event(
+            "device_token.rotation",
+            "failure",
+            request=request,
+            details={"device_id": device_id, "detail": "Invalid TOTP code"},
+        )
+        raise HTTPException(status_code=401, detail="Invalid TOTP code")
+    result = rotate_device_token(device_id, request)
+    if not result:
+        audit_event(
+            "device_token.rotation",
+            "failure",
+            request=request,
+            details={"device_id": device_id, "detail": "Unknown or expired device token"},
+        )
+        raise HTTPException(status_code=404, detail="Unknown or expired device token")
+    audit_event(
+        "device_token.rotation",
+        "success",
+        request=request,
+        details={
+            "old_device_id": device_id,
+            "new_device_id": result["device"]["deviceId"],
+            "device_label": result["device"]["deviceLabel"],
+            "expires_at": result["device"]["expiresAt"],
+        },
+    )
+    return result
 
 
 @router.post("/api/auth/webauthn/register/options", dependencies=protected)

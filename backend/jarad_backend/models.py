@@ -52,3 +52,7 @@ class DeviceTokenRegisterRequest(BaseModel):
 
 class DeviceTokenRevokeRequest(BaseModel):
     totpCode: str
+
+
+class DeviceTokenRotateRequest(BaseModel):
+    totpCode: str

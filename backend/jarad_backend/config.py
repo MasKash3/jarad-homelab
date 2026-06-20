@@ -47,6 +47,20 @@ TOTP_SECRET = "".join(env("JARAD_TOTP_SECRET", "", "HOMELAB_TOTP_SECRET").split(
 ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP = (
     env("JARAD_ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP", "0", "HOMELAB_ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP") == "1"
 )
+
+
+def positive_int_env(name: str, default: str, legacy_name: str | None = None) -> int:
+    raw_value = env(name, default, legacy_name)
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be a positive integer.") from exc
+    if value < 1:
+        raise RuntimeError(f"{name} must be a positive integer.")
+    return value
+
+
+DEVICE_TOKEN_TTL_DAYS = positive_int_env("JARAD_DEVICE_TOKEN_TTL_DAYS", "90", "HOMELAB_DEVICE_TOKEN_TTL_DAYS")
 PUBLIC_HOST = env("JARAD_PUBLIC_HOST", "home.example", "HOMELAB_PUBLIC_HOST")
 SERVICE_DOMAIN = env("JARAD_SERVICE_DOMAIN", "", "HOMELAB_SERVICE_DOMAIN")
 LAN_IP = env("JARAD_LAN_IP", "10.0.0.10", "HOMELAB_LAN_IP")

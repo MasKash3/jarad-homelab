@@ -148,6 +148,12 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
       body: JSON.stringify({ deviceLabel, totpCode })
     });
   },
+  async rotateDeviceToken(totpCode) {
+    return request("/api/auth/devices/current/rotate", {
+      method: "POST",
+      body: JSON.stringify({ totpCode })
+    });
+  },
   async revokeDeviceToken(deviceId, totpCode) {
     return request(`/api/auth/devices/${encodeURIComponent(deviceId)}`, {
       method: "DELETE",

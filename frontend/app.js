@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.3';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.20.3';
-import { createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.20.3';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.3';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.20.3';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.4';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.20.4';
+import { createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.20.4';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.4';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.20.4';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -251,15 +251,23 @@ function renderConfig() {
       <button class="text-button" type="button" data-delete-passkey="${escapeAttr(credential.credentialId)}">Remove</button>
     </article>
   `).join("") || emptyState("No passkeys registered on this backend yet.");
-  $("#deviceTokenList").innerHTML = deviceTokens.map((device) => `
+  $("#deviceTokenList").innerHTML = deviceTokens.map((device) => {
+    const deviceStatus = device.revokedAt
+      ? `Revoked ${formatUpdated(device.revokedAt)}`
+      : `${device.lastUsedAt ? `Last used ${formatUpdated(device.lastUsedAt)}` : `Created ${formatUpdated(device.createdAt)}`}${device.expiresAt ? `; expires ${formatUpdated(device.expiresAt)}` : ""}`;
+    return `
     <article class="config-card ${device.revokedAt ? "is-muted" : ""}">
       <div>
         <strong>${escapeHtml(device.deviceLabel || "Registered device")}${device.isCurrent ? ` <span class="inline-muted">(current)</span>` : ""}</strong>
-        <p>${escapeHtml(device.revokedAt ? `Revoked ${formatUpdated(device.revokedAt)}` : device.lastUsedAt ? `Last used ${formatUpdated(device.lastUsedAt)}` : `Created ${formatUpdated(device.createdAt)}`)}</p>
+        <p>${escapeHtml(deviceStatus)}</p>
       </div>
-      ${device.revokedAt ? `<span class="pill warn">Revoked</span>` : `<button class="text-button" type="button" data-revoke-device="${escapeAttr(device.deviceId)}">Revoke</button>`}
+      ${device.revokedAt ? `<span class="pill warn">Revoked</span>` : `
+        ${device.isCurrent ? `<button class="text-button" type="button" data-rotate-device>Rotate</button>` : ""}
+        <button class="text-button" type="button" data-revoke-device="${escapeAttr(device.deviceId)}">Revoke</button>
+      `}
     </article>
-  `).join("") || emptyState("No per-device tokens registered yet.");
+  `;
+  }).join("") || emptyState("No per-device tokens registered yet.");
   $("#deviceTokenHelp").textContent = deviceTokenMessage;
   $("#deviceTokenHelp").hidden = !deviceTokenMessage;
   $("#deviceTokenHelp").className = `config-help ${deviceTokenMessageState}`;
@@ -281,6 +289,9 @@ function renderConfig() {
   });
   $$("[data-revoke-device]").forEach((button) => {
     button.addEventListener("click", () => revokeDeviceToken(button.dataset.revokeDevice));
+  });
+  $$("[data-rotate-device]").forEach((button) => {
+    button.addEventListener("click", rotateCurrentDeviceToken);
   });
   renderAudit();
 }
@@ -687,6 +698,32 @@ async function registerThisDeviceToken() {
   } finally {
     button.disabled = false;
     button.textContent = originalText;
+  }
+}
+
+async function rotateCurrentDeviceToken() {
+  try {
+    const settings = readSettings();
+    const totpCode = await requestTotpForPasskeyManagement("Rotate Device Token", "Enter your TOTP code to replace this browser's device token.");
+    if (!totpCode) {
+      throw new Error("TOTP is required to rotate this device token.");
+    }
+    const result = await api.rotateDeviceToken(totpCode);
+    writeSettings({
+      ...settings,
+      token: result.token
+    });
+    deviceTokenMessage = "This browser's device token was rotated.";
+    deviceTokenMessageState = "good";
+    addAudit("Rotated device token", "config", "success", result.device?.deviceLabel || "This device");
+    await refreshDeviceTokens();
+    renderSettings();
+    refreshState();
+  } catch (error) {
+    deviceTokenMessage = error.message;
+    deviceTokenMessageState = "bad";
+    addAudit("Device token rotation failed", "config", "failure", error.message);
+    renderConfig();
   }
 }
 

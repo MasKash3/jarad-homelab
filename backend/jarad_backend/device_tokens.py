@@ -28,6 +28,22 @@ def create_device_token(device_label: str | None, request: Request) -> dict[str,
     }
 
 
+def rotate_device_token(device_id: str, request: Request) -> dict[str, Any] | None:
+    raw_token = secrets.token_urlsafe(32)
+    device = store.rotate_device_token(
+        device_id=device_id,
+        token_hash=hash_access_token(raw_token),
+        remote_addr=client_addr(request),
+        user_agent=(request.headers.get("user-agent") or "")[:240],
+    )
+    if not device:
+        return None
+    return {
+        "token": raw_token,
+        "device": public_device(device),
+    }
+
+
 def list_device_tokens() -> list[dict[str, Any]]:
     return [public_device(device) for device in store.list_device_tokens(include_revoked=False)]
 
@@ -43,7 +59,8 @@ def public_device(device: dict[str, Any]) -> dict[str, Any]:
         "createdAt": device["created_at"],
         "lastUsedAt": device["last_used_at"],
         "revokedAt": device["revoked_at"],
+        "expiresAt": device["expires_at"],
+        "rotatedAt": device["rotated_at"],
         "remoteAddr": device["remote_addr"],
         "userAgent": device["user_agent"],
     }
-
