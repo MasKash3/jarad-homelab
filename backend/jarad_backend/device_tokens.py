@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import Request
 
 from .auth import hash_access_token
+from .request_address import client_addr
 from .webauthn_store import WebAuthnStore
 
 
@@ -46,9 +47,3 @@ def public_device(device: dict[str, Any]) -> dict[str, Any]:
         "userAgent": device["user_agent"],
     }
 
-
-def client_addr(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",", 1)[0].strip()[:80]
-    return request.client.host[:80] if request.client else None

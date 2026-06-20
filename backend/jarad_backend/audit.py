@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import Request
 
+from .request_address import client_addr
 from .webauthn_store import WebAuthnStore
 
 
@@ -40,12 +41,7 @@ def audit_event(
 
 
 def _client_addr(request: Request | None) -> str | None:
-    if not request:
-        return None
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return _clamp(forwarded.split(",", 1)[0].strip(), 80)
-    return _clamp(request.client.host if request.client else None, 80)
+    return _clamp(client_addr(request), 80)
 
 
 def _actor(request: Request | None) -> str:

@@ -10,7 +10,10 @@ __TAILSCALE_DOMAIN__:__APP_PORT__ {
         Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
     }
 
-    reverse_proxy /api/* localhost:8443
+    reverse_proxy /api/* localhost:8443 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+    }
     reverse_proxy localhost:5178
 }
 # jarad:end

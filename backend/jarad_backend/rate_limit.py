@@ -8,16 +8,17 @@ from typing import Deque
 
 from fastapi import HTTPException, Request
 
+from .request_address import client_addr
+
 
 _attempts: dict[str, Deque[float]] = defaultdict(deque)
 _lock = threading.Lock()
 
 
 def client_key(request: Request, bucket: str) -> str:
-    forwarded_for = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-    client_host = request.client.host if request.client else "unknown"
+    client_host = client_addr(request) or "unknown"
     auth_digest = hashlib.sha256((request.headers.get("authorization") or "").encode("utf-8")).hexdigest()[:16]
-    return f"{bucket}:{client_host}:{forwarded_for}:{auth_digest}"
+    return f"{bucket}:{client_host}:{auth_digest}"
 
 
 def enforce_rate_limit(request: Request, *, bucket: str, limit: int, window_seconds: int) -> None:
