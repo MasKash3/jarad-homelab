@@ -45,6 +45,7 @@ if not APP_TOKEN or (APP_TOKEN == PLACEHOLDER_APP_TOKEN and not ALLOW_INSECURE_D
     raise RuntimeError("Set JARAD_APP_TOKEN to a long random value before starting Jarad Backend.")
 TOTP_SECRET = "".join(env("JARAD_TOTP_SECRET", "", "HOMELAB_TOTP_SECRET").split())
 PUBLIC_HOST = env("JARAD_PUBLIC_HOST", "home.example", "HOMELAB_PUBLIC_HOST")
+SERVICE_DOMAIN = env("JARAD_SERVICE_DOMAIN", "", "HOMELAB_SERVICE_DOMAIN")
 LAN_IP = env("JARAD_LAN_IP", "10.0.0.10", "HOMELAB_LAN_IP")
 WEBAUTHN_RP_ID = env("JARAD_WEBAUTHN_RP_ID", PUBLIC_HOST.split(":")[0], "HOMELAB_WEBAUTHN_RP_ID")
 WEBAUTHN_ORIGIN = env("JARAD_WEBAUTHN_ORIGIN", f"https://{WEBAUTHN_RP_ID}:8444", "HOMELAB_WEBAUTHN_ORIGIN")
@@ -63,6 +64,14 @@ ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
+
+def service_url(subdomain: str, legacy_port: int | None = None, path: str = "") -> str:
+    if SERVICE_DOMAIN:
+        return f"https://{subdomain}.{SERVICE_DOMAIN}{path}"
+    port = f":{legacy_port}" if legacy_port else ""
+    return f"https://{PUBLIC_HOST}{port}{path}"
+
+
 SERVICES: dict[str, dict[str, str]] = {
     "nextcloud": {
         "name": "Nextcloud",
@@ -70,7 +79,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "icon": "NC",
         "container": "nextcloud-app-1",
         "image": "nextcloud:apache",
-        "url": f"https://{PUBLIC_HOST}",
+        "url": service_url("nextcloud"),
         "color": "#2563a6",
     },
     "immich": {
@@ -79,7 +88,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "icon": "IM",
         "container": "immich_server",
         "image": "ghcr.io/immich-app/immich-server:release",
-        "url": f"https://{PUBLIC_HOST}:2283",
+        "url": service_url("immich", 2283),
         "color": "#0f766e",
     },
     "jellyfin": {
@@ -88,7 +97,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "icon": "JF",
         "container": "jellyfin",
         "image": "jellyfin/jellyfin:latest",
-        "url": f"https://{PUBLIC_HOST}:8096",
+        "url": service_url("jellyfin", 8096),
         "color": "#7c3aed",
     },
     "portainer": {
@@ -97,7 +106,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "icon": "PT",
         "container": "portainer",
         "image": "portainer/portainer-ce:latest",
-        "url": f"https://{PUBLIC_HOST}:9000",
+        "url": service_url("portainer", 9000),
         "color": "#0ea5e9",
     },
     "pihole": {
@@ -106,7 +115,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "icon": "PH",
         "container": "pihole",
         "image": "pihole/pihole:latest",
-        "url": f"https://{PUBLIC_HOST}:8053",
+        "url": service_url("pihole", 8053, "/admin"),
         "color": "#dc2626",
     },
     "dozzle": {
@@ -115,7 +124,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "icon": "DZ",
         "container": "dozzle",
         "image": "amir20/dozzle:latest",
-        "url": f"https://{PUBLIC_HOST}:8082",
+        "url": service_url("dozzle", 8082),
         "color": "#334155",
     },
     "uptime-kuma": {
@@ -124,7 +133,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "icon": "UK",
         "container": "uptime-kuma",
         "image": "louislam/uptime-kuma:latest",
-        "url": f"https://{PUBLIC_HOST}:3001",
+        "url": service_url("uptime", 3001),
         "color": "#16a34a",
     },
     "stirling-pdf": {
@@ -133,7 +142,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "icon": "SP",
         "container": "stirling-pdf",
         "image": "frooodle/s-pdf:latest",
-        "url": f"https://{PUBLIC_HOST}:8081",
+        "url": service_url("stirling", 8081),
         "color": "#ca8a04",
     },
 }

@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.19.13';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.19.13';
-import { createApi } from './js/api.js?v=2026.06.19.13';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.19.13';
-import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.19.13';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.1';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.20.1';
+import { createApi } from './js/api.js?v=2026.06.20.1';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.1';
+import { $, $$, colorForState, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeCssColor, safeUrl, stateClass } from './js/utils.js?v=2026.06.20.1';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -55,7 +55,7 @@ function writeSettings(settings) {
 }
 
 function hasAutoBackend() {
-  return window.location.protocol === "https:" && window.location.hostname.endsWith(".ts.net");
+  return window.location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(window.location.hostname);
 }
 
 function noDataPanel(title, message) {

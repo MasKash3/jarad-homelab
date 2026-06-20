@@ -2,7 +2,8 @@ import { createNoDataState } from './empty-state.js';
 
 function defaultBaseUrl() {
   const isTailscaleHttps = window.location.protocol === "https:" && window.location.hostname.endsWith(".ts.net");
-  return isTailscaleHttps ? window.location.origin : "";
+  const isHttpsCustomDomain = window.location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(window.location.hostname);
+  return isTailscaleHttps || isHttpsCustomDomain ? window.location.origin : "";
 }
 
 function effectiveSettings(settings) {
@@ -17,6 +18,9 @@ function connectionLabel(baseUrl) {
   const url = new URL(baseUrl);
   if (url.protocol === "https:" && url.hostname.endsWith(".ts.net")) {
     return "Live via Tailscale";
+  }
+  if (url.protocol === "https:") {
+    return "Live via private domain";
   }
   if (url.hostname === "127.0.0.1" || url.hostname === "localhost") {
     return "Live local";
