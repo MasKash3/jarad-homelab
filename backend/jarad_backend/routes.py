@@ -8,9 +8,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .audit import audit_event
-from .auth import require_token, verify_action_auth, verify_totp_for_actor
+from .auth import require_device_token, require_token, verify_action_auth, verify_totp_for_actor
 from .config import ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP, LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
-from .device_tokens import create_device_token, list_device_tokens, revoke_device_token, rotate_device_token
+from .device_tokens import create_browser_session, create_device_token, list_device_tokens, revoke_device_token, rotate_device_token
 from .docker import docker_action, docker_logs
 from .metrics import read_backup_state, read_cpu_pct, read_disk, read_raid_state, read_ram_pct, read_temp_c, read_uptime
 from .models import (
@@ -97,6 +97,23 @@ def auth_devices(request: Request) -> dict[str, Any]:
     }
 
 
+@router.post("/api/auth/session")
+def auth_session_create(request: Request, device: dict[str, Any] = Depends(require_device_token)) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="browser-session-create", limit=20, window_seconds=300)
+    result = create_browser_session(device["device_id"], request)
+    audit_event(
+        "browser_session.created",
+        "success",
+        request=request,
+        details={
+            "device_id": device["device_id"],
+            "session_id": result["session"]["sessionId"],
+            "expires_at": result["session"]["expiresAt"],
+        },
+    )
+    return result
+
+
 @router.post("/api/auth/devices/register", dependencies=protected)
 def auth_device_register(payload: DeviceTokenRegisterRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="device-token-register", limit=6, window_seconds=300)
@@ -145,7 +162,7 @@ def auth_device_revoke(device_id: str, payload: DeviceTokenRevokeRequest, reques
 def auth_device_rotate(payload: DeviceTokenRotateRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="device-token-rotate", limit=5, window_seconds=300)
     device_id = getattr(request.state, "auth_device_id", None)
-    if not device_id:
+    if not device_id or getattr(request.state, "auth_token_kind", None) != "device":
         audit_event(
             "device_token.rotation",
             "failure",

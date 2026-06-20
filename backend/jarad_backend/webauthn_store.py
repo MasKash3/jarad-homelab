@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from .config import DB_PATH, DEVICE_TOKEN_TTL_DAYS
+from .config import BROWSER_SESSION_TTL_MINUTES, DB_PATH, DEVICE_TOKEN_TTL_DAYS
 
 
 CHALLENGE_TTL_SECONDS = 180
@@ -118,6 +118,25 @@ class WebAuthnStore:
             db.execute("CREATE INDEX IF NOT EXISTS idx_device_tokens_token_hash ON device_tokens(token_hash)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_device_tokens_created_at ON device_tokens(created_at)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_device_tokens_expires_at ON device_tokens(expires_at)")
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS browser_sessions (
+                    session_id TEXT PRIMARY KEY,
+                    token_hash TEXT NOT NULL UNIQUE,
+                    device_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    last_used_at TEXT,
+                    expires_at TEXT NOT NULL,
+                    revoked_at TEXT,
+                    remote_addr TEXT,
+                    user_agent TEXT,
+                    FOREIGN KEY(device_id) REFERENCES device_tokens(device_id)
+                )
+                """
+            )
+            db.execute("CREATE INDEX IF NOT EXISTS idx_browser_sessions_token_hash ON browser_sessions(token_hash)")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_browser_sessions_device_id ON browser_sessions(device_id)")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_browser_sessions_expires_at ON browser_sessions(expires_at)")
 
     def ensure_device_token_columns(self, db: sqlite3.Connection) -> None:
         columns = {row["name"] for row in db.execute("PRAGMA table_info(device_tokens)").fetchall()}
@@ -348,6 +367,75 @@ class WebAuthnStore:
             db.execute("UPDATE device_tokens SET last_used_at = ? WHERE device_id = ?", (iso(now), row["device_id"]))
             return dict(row)
 
+    def create_browser_session(
+        self,
+        *,
+        device_id: str,
+        token_hash: str,
+        remote_addr: str | None = None,
+        user_agent: str | None = None,
+    ) -> dict[str, Any]:
+        now_dt = utc_now()
+        now = iso(now_dt)
+        expires_at = iso(now_dt + timedelta(minutes=BROWSER_SESSION_TTL_MINUTES))
+        session_id = secrets.token_urlsafe(18)
+        with self.connect() as db:
+            db.execute(
+                """
+                INSERT INTO browser_sessions
+                    (session_id, token_hash, device_id, created_at, expires_at, remote_addr, user_agent)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (session_id, token_hash, device_id, now, expires_at, remote_addr, user_agent),
+            )
+        return {
+            "session_id": session_id,
+            "device_id": device_id,
+            "created_at": now,
+            "last_used_at": None,
+            "expires_at": expires_at,
+            "revoked_at": None,
+            "remote_addr": remote_addr,
+            "user_agent": user_agent,
+        }
+
+    def get_active_browser_session(self, token_hash: str) -> dict[str, Any] | None:
+        now = utc_now()
+        now_iso = iso(now)
+        with self.connect() as db:
+            row = db.execute(
+                """
+                SELECT
+                    browser_sessions.*,
+                    device_tokens.device_label
+                FROM browser_sessions
+                JOIN device_tokens ON browser_sessions.device_id = device_tokens.device_id
+                WHERE
+                    browser_sessions.token_hash = ?
+                    AND browser_sessions.revoked_at IS NULL
+                    AND browser_sessions.expires_at > ?
+                    AND device_tokens.revoked_at IS NULL
+                    AND device_tokens.expires_at > ?
+                """,
+                (token_hash, now_iso, now_iso),
+            ).fetchone()
+            if not row:
+                return None
+            db.execute("UPDATE browser_sessions SET last_used_at = ? WHERE session_id = ?", (now_iso, row["session_id"]))
+            db.execute("UPDATE device_tokens SET last_used_at = ? WHERE device_id = ?", (now_iso, row["device_id"]))
+            return dict(row)
+
+    def revoke_browser_sessions_for_device(self, device_id: str) -> None:
+        with self.connect() as db:
+            db.execute(
+                """
+                UPDATE browser_sessions
+                SET revoked_at = ?
+                WHERE device_id = ? AND revoked_at IS NULL
+                """,
+                (iso(utc_now()), device_id),
+            )
+
     def has_active_device_tokens(self) -> bool:
         now = iso(utc_now())
         with self.connect() as db:
@@ -378,14 +466,24 @@ class WebAuthnStore:
 
     def revoke_device_token(self, device_id: str) -> bool:
         with self.connect() as db:
+            now = iso(utc_now())
             result = db.execute(
                 """
                 UPDATE device_tokens
                 SET revoked_at = ?
                 WHERE device_id = ? AND revoked_at IS NULL
                 """,
-                (iso(utc_now()), device_id),
+                (now, device_id),
             )
+            if result.rowcount > 0:
+                db.execute(
+                    """
+                    UPDATE browser_sessions
+                    SET revoked_at = ?
+                    WHERE device_id = ? AND revoked_at IS NULL
+                    """,
+                    (now, device_id),
+                )
             return result.rowcount > 0
 
     def rotate_device_token(
@@ -417,6 +515,14 @@ class WebAuthnStore:
                 WHERE device_id = ? AND revoked_at IS NULL
                 """,
                 (now, now, device_id),
+            )
+            db.execute(
+                """
+                UPDATE browser_sessions
+                SET revoked_at = ?
+                WHERE device_id = ? AND revoked_at IS NULL
+                """,
+                (now, device_id),
             )
             db.execute(
                 """

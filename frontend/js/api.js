@@ -1,6 +1,8 @@
 import { createNoDataState } from './empty-state.js';
 
 const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1"]);
+const BROWSER_SESSION_KEY = "jarad.browserSession";
+const SESSION_REFRESH_SKEW_MS = 30_000;
 
 export function isProductionFrontend() {
   return window.location.protocol === "https:" && !LOCAL_HOSTNAMES.has(window.location.hostname);
@@ -50,6 +52,57 @@ function effectiveSettings(settings) {
   };
 }
 
+function readBrowserSession() {
+  try {
+    return JSON.parse(sessionStorage.getItem(BROWSER_SESSION_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeBrowserSession(session) {
+  sessionStorage.setItem(BROWSER_SESSION_KEY, JSON.stringify(session));
+}
+
+export function clearBrowserSession() {
+  sessionStorage.removeItem(BROWSER_SESSION_KEY);
+}
+
+function hasUsableBrowserSession(session) {
+  if (!session.token || !session.expiresAt) return false;
+  return Date.parse(session.expiresAt) > Date.now() + SESSION_REFRESH_SKEW_MS;
+}
+
+async function createBrowserSession(currentSettings) {
+  if (!currentSettings.token || !currentSettings.baseUrl) return null;
+  const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}/api/auth/session`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${currentSettings.token}` }
+  });
+  if (!response.ok) return null;
+  const payload = await response.json();
+  if (!payload.token || !payload.session?.expiresAt) return null;
+  const session = {
+    token: payload.token,
+    expiresAt: payload.session.expiresAt,
+    sessionId: payload.session.sessionId,
+    deviceId: payload.session.deviceId
+  };
+  writeBrowserSession(session);
+  return session;
+}
+
+async function authTokenFor(currentSettings, authMode = "session") {
+  if (!currentSettings.token) return "";
+  if (authMode === "device") return currentSettings.token;
+
+  const existingSession = readBrowserSession();
+  if (hasUsableBrowserSession(existingSession)) return existingSession.token;
+
+  const nextSession = await createBrowserSession(currentSettings);
+  return nextSession?.token || currentSettings.token;
+}
+
 function connectionLabel(baseUrl) {
   const url = new URL(baseUrl);
   if (url.protocol === "https:" && url.hostname.endsWith(".ts.net")) {
@@ -70,13 +123,15 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
     if (!currentSettings.baseUrl) {
       throw new Error("Backend is not configured");
     }
+    const { authMode = "session", ...fetchOptions } = options;
+    const authToken = await authTokenFor(currentSettings, authMode);
 
     const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}${path}`, {
-      ...options,
+      ...fetchOptions,
       headers: {
-        ...(options.body ? { "Content-Type": "application/json" } : {}),
-        ...(currentSettings.token ? { Authorization: `Bearer ${currentSettings.token}` } : {}),
-        ...(options.headers || {})
+        ...(fetchOptions.body ? { "Content-Type": "application/json" } : {}),
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        ...(fetchOptions.headers || {})
       }
     });
     if (!response.ok) {
@@ -102,8 +157,9 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
     }
 
     try {
+      const authToken = await authTokenFor(currentSettings);
       const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}/api/mobile/state`, {
-        headers: currentSettings.token ? { Authorization: `Bearer ${currentSettings.token}` } : {}
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
       });
       if (!response.ok) throw new Error(`Backend returned ${response.status}`);
       const data = await response.json();
@@ -145,14 +201,18 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
   async registerDeviceToken(deviceLabel, totpCode) {
     return request("/api/auth/devices/register", {
       method: "POST",
-      body: JSON.stringify({ deviceLabel, totpCode })
+      body: JSON.stringify({ deviceLabel, totpCode }),
+      authMode: "device"
     });
   },
   async rotateDeviceToken(totpCode) {
-    return request("/api/auth/devices/current/rotate", {
+    const result = await request("/api/auth/devices/current/rotate", {
       method: "POST",
-      body: JSON.stringify({ totpCode })
+      body: JSON.stringify({ totpCode }),
+      authMode: "device"
     });
+    clearBrowserSession();
+    return result;
   },
   async revokeDeviceToken(deviceId, totpCode) {
     return request(`/api/auth/devices/${encodeURIComponent(deviceId)}`, {

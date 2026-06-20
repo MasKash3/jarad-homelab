@@ -44,6 +44,25 @@ def rotate_device_token(device_id: str, request: Request) -> dict[str, Any] | No
     }
 
 
+def create_browser_session(device_id: str, request: Request) -> dict[str, Any]:
+    raw_token = secrets.token_urlsafe(32)
+    session = store.create_browser_session(
+        device_id=device_id,
+        token_hash=hash_access_token(raw_token),
+        remote_addr=client_addr(request),
+        user_agent=(request.headers.get("user-agent") or "")[:240],
+    )
+    return {
+        "token": raw_token,
+        "session": {
+            "sessionId": session["session_id"],
+            "deviceId": session["device_id"],
+            "createdAt": session["created_at"],
+            "expiresAt": session["expires_at"],
+        },
+    }
+
+
 def list_device_tokens() -> list[dict[str, Any]]:
     return [public_device(device) for device in store.list_device_tokens(include_revoked=False)]
 

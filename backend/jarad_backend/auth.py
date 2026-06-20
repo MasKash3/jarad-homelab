@@ -43,9 +43,20 @@ def require_token(request: Request, authorization: str | None = Header(default=N
     if not token:
         raise HTTPException(status_code=401, detail="Invalid or missing bearer token")
 
-    device = store.get_active_device_token(hash_access_token(token))
+    token_hash = hash_access_token(token)
+    session = store.get_active_browser_session(token_hash)
+    if session:
+        request.state.auth_actor = f"session:{session['session_id']}"
+        request.state.auth_token_kind = "session"
+        request.state.auth_session_id = session["session_id"]
+        request.state.auth_device_id = session["device_id"]
+        request.state.auth_device_label = session["device_label"]
+        return
+
+    device = store.get_active_device_token(token_hash)
     if device:
         request.state.auth_actor = f"device:{device['device_id']}"
+        request.state.auth_token_kind = "device"
         request.state.auth_device_id = device["device_id"]
         request.state.auth_device_label = device["device_label"]
         return
@@ -53,13 +64,30 @@ def require_token(request: Request, authorization: str | None = Header(default=N
     if secrets.compare_digest(token, APP_TOKEN):
         active_devices_exist = store.has_active_device_tokens()
         if active_devices_exist and request.url.path not in BOOTSTRAP_ALLOWED_PATHS:
-            raise HTTPException(status_code=401, detail="Use a registered device token for this request")
+            raise HTTPException(status_code=401, detail="Use a registered device token or browser session for this request")
         request.state.auth_actor = "bootstrap-token"
+        request.state.auth_token_kind = "bootstrap"
         request.state.auth_device_id = None
         request.state.auth_device_label = "Bootstrap token"
         return
 
     raise HTTPException(status_code=401, detail="Invalid or missing bearer token")
+
+
+def require_device_token(request: Request, authorization: str | None = Header(default=None)) -> dict:
+    token = bearer_token(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="Invalid or missing bearer token")
+
+    device = store.get_active_device_token(hash_access_token(token))
+    if device:
+        request.state.auth_actor = f"device:{device['device_id']}"
+        request.state.auth_token_kind = "device"
+        request.state.auth_device_id = device["device_id"]
+        request.state.auth_device_label = device["device_label"]
+        return device
+
+    raise HTTPException(status_code=401, detail="Use a registered device token for this request")
 
 
 def bearer_token(authorization: str | None) -> str | None:

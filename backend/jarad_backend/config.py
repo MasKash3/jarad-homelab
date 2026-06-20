@@ -61,6 +61,11 @@ def positive_int_env(name: str, default: str, legacy_name: str | None = None) ->
 
 
 DEVICE_TOKEN_TTL_DAYS = positive_int_env("JARAD_DEVICE_TOKEN_TTL_DAYS", "90", "HOMELAB_DEVICE_TOKEN_TTL_DAYS")
+BROWSER_SESSION_TTL_MINUTES = positive_int_env(
+    "JARAD_BROWSER_SESSION_TTL_MINUTES",
+    "30",
+    "HOMELAB_BROWSER_SESSION_TTL_MINUTES",
+)
 PUBLIC_HOST = env("JARAD_PUBLIC_HOST", "home.example", "HOMELAB_PUBLIC_HOST")
 SERVICE_DOMAIN = env("JARAD_SERVICE_DOMAIN", "", "HOMELAB_SERVICE_DOMAIN")
 LAN_IP = env("JARAD_LAN_IP", "10.0.0.10", "HOMELAB_LAN_IP")

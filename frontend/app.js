@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.4';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.20.4';
-import { createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.20.4';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.4';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.20.4';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.5';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.20.5';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.20.5';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.5';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.20.5';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -51,6 +51,10 @@ function readSettings() {
 }
 
 function writeSettings(settings) {
+  const previous = readSettings();
+  if (previous.token !== settings.token || previous.baseUrl !== settings.baseUrl) {
+    clearBrowserSession();
+  }
   localStorage.setItem(storageKeys.settings, JSON.stringify(settings));
 }
 
