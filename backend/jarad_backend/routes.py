@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .audit import audit_event
-from .auth import require_token, verify_action_auth, verify_totp
+from .auth import require_token, verify_action_auth, verify_totp_for_actor
 from .config import LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
 from .device_tokens import create_device_token, list_device_tokens, revoke_device_token
 from .docker import docker_action, docker_logs
@@ -50,10 +50,10 @@ def diagnostic_state(value: str) -> str:
     return "pass"
 
 
-def require_credential_management_auth(totp_code: str | None) -> None:
+def require_credential_management_auth(totp_code: str | None, request: Request, *, consume: bool) -> None:
     if not list_registered_credentials():
         return
-    if not verify_totp(totp_code or ""):
+    if not verify_totp_for_actor(totp_code or "", request, consume=consume):
         raise HTTPException(status_code=401, detail="TOTP is required to manage passkeys")
 
 
@@ -66,7 +66,7 @@ def health() -> dict[str, str]:
 def check_totp(payload: TotpCheckRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="totp-check", limit=6, window_seconds=60)
     configured = bool(TOTP_SECRET)
-    valid = verify_totp(payload.code) if configured else False
+    valid = verify_totp_for_actor(payload.code, request, consume=False) if configured else False
     audit_event(
         "totp.check",
         "success" if valid else "failure",
@@ -92,7 +92,7 @@ def auth_devices(request: Request) -> dict[str, Any]:
 @router.post("/api/auth/devices/register", dependencies=protected)
 def auth_device_register(payload: DeviceTokenRegisterRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="device-token-register", limit=6, window_seconds=300)
-    if not verify_totp(payload.totpCode):
+    if not verify_totp_for_actor(payload.totpCode, request, consume=True):
         audit_event(
             "device_token.registration",
             "failure",
@@ -113,7 +113,7 @@ def auth_device_register(payload: DeviceTokenRegisterRequest, request: Request) 
 @router.delete("/api/auth/devices/{device_id}", dependencies=protected)
 def auth_device_revoke(device_id: str, payload: DeviceTokenRevokeRequest, request: Request) -> dict[str, str]:
     enforce_rate_limit(request, bucket="device-token-revoke", limit=5, window_seconds=300)
-    if not verify_totp(payload.totpCode):
+    if not verify_totp_for_actor(payload.totpCode, request, consume=True):
         audit_event(
             "device_token.revocation",
             "failure",
@@ -137,7 +137,7 @@ def auth_device_revoke(device_id: str, payload: DeviceTokenRevokeRequest, reques
 def webauthn_register_options(payload: WebAuthnRegisterOptionsRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="webauthn-register-options", limit=20, window_seconds=300)
     try:
-        require_credential_management_auth(payload.totpCode)
+        require_credential_management_auth(payload.totpCode, request, consume=False)
         return begin_registration(payload.deviceLabel)
     except HTTPException as exc:
         audit_event(
@@ -153,7 +153,7 @@ def webauthn_register_options(payload: WebAuthnRegisterOptionsRequest, request: 
 def webauthn_register_verify(payload: WebAuthnRegisterVerifyRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="webauthn-register-verify", limit=20, window_seconds=300)
     try:
-        require_credential_management_auth(payload.totpCode)
+        require_credential_management_auth(payload.totpCode, request, consume=True)
         result = finish_registration(payload.challengeId, payload.credential, payload.deviceLabel)
     except HTTPException as exc:
         audit_event(
@@ -182,7 +182,7 @@ def webauthn_credentials() -> dict[str, Any]:
 def webauthn_delete_credential(credential_id: str, payload: WebAuthnCredentialDeleteRequest, request: Request) -> dict[str, str]:
     enforce_rate_limit(request, bucket="webauthn-credential-delete", limit=5, window_seconds=300)
     try:
-        require_credential_management_auth(payload.totpCode)
+        require_credential_management_auth(payload.totpCode, request, consume=True)
         remove_registered_credential(credential_id)
     except HTTPException as exc:
         audit_event(
@@ -312,7 +312,7 @@ def service_logs(service_id: str, payload: ActionRequest, request: Request, limi
         raise HTTPException(status_code=404, detail="Unknown service")
     action_id = f"view-logs-{service_id}"
     try:
-        verify_action_auth(payload, action_id, service_id)
+        verify_action_auth(payload, action_id, service_id, request)
     except HTTPException as exc:
         audit_event(
             action_auth_event_type((payload.authMethod or "").lower()),
@@ -373,7 +373,7 @@ def service_diagnostics(service_id: str, payload: ActionRequest, request: Reques
         raise HTTPException(status_code=404, detail="Unknown service")
     action_id = f"view-diagnostics-{service_id}"
     try:
-        verify_action_auth(payload, action_id, service_id)
+        verify_action_auth(payload, action_id, service_id, request)
     except HTTPException as exc:
         audit_event(
             action_auth_event_type((payload.authMethod or "").lower()),
@@ -413,7 +413,7 @@ def service_action(action_id: str, payload: ActionRequest, request: Request) -> 
         raise HTTPException(status_code=400, detail="Unsupported action")
     method = (payload.authMethod or "").lower()
     try:
-        verify_action_auth(payload, action_id, service_id)
+        verify_action_auth(payload, action_id, service_id, request)
     except HTTPException as exc:
         audit_event(
             action_auth_event_type(method),

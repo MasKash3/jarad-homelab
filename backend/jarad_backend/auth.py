@@ -5,7 +5,10 @@ import binascii
 import hashlib
 import hmac
 import secrets
+import threading
 import time
+from collections import deque
+from typing import Deque
 
 from fastapi import Header, HTTPException, Request
 
@@ -17,6 +20,18 @@ from .webauthn_store import WebAuthnStore
 
 store = WebAuthnStore()
 BOOTSTRAP_ALLOWED_PATHS = {"/api/auth/devices/register"}
+TOTP_STEP_SECONDS = 30
+TOTP_FAILURE_WINDOW_SECONDS = 300
+TOTP_FAILURE_LIMIT = 5
+TOTP_LOCKOUT_BASE_SECONDS = 60
+TOTP_LOCKOUT_MAX_SECONDS = 900
+TOTP_USED_RETENTION_SECONDS = 120
+
+_totp_lock = threading.Lock()
+_totp_failures: dict[str, Deque[float]] = {}
+_totp_lockouts: dict[str, float] = {}
+_totp_lockout_counts: dict[str, int] = {}
+_used_totp_steps: dict[tuple[str, int, str], float] = {}
 
 
 def hash_access_token(token: str) -> str:
@@ -56,10 +71,10 @@ def bearer_token(authorization: str | None) -> str | None:
     return token
 
 
-def verify_action_auth(payload: ActionRequest, action_id: str, service_id: str) -> None:
+def verify_action_auth(payload: ActionRequest, action_id: str, service_id: str, request: Request) -> None:
     method = (payload.authMethod or "").lower()
     if method == "totp":
-        if not verify_totp(payload.totpCode or ""):
+        if not verify_totp_for_actor(payload.totpCode or "", request, consume=True):
             raise HTTPException(status_code=401, detail="Invalid TOTP code")
         return
     if method == "fingerprint":
@@ -72,13 +87,95 @@ def verify_action_auth(payload: ActionRequest, action_id: str, service_id: str) 
 
 
 def verify_totp(code: str) -> bool:
+    return matching_totp_step(code) is not None
+
+
+def verify_totp_for_actor(code: str, request: Request, *, consume: bool) -> bool:
+    actor = totp_actor(request)
+    now = time.monotonic()
+    ensure_totp_not_locked(actor, now)
+
+    matched_step = matching_totp_step(code)
+    if matched_step is None:
+        record_totp_failure(actor, now)
+        return False
+
+    if consume and not consume_totp_step(actor, matched_step, code, now):
+        record_totp_failure(actor, now)
+        return False
+
+    record_totp_success(actor)
+    return True
+
+
+def matching_totp_step(code: str) -> int | None:
     if not TOTP_SECRET:
         raise HTTPException(status_code=500, detail="TOTP is not configured on the backend")
     if not code.isdigit() or len(code) != 6:
-        return False
+        return None
 
-    timestep = int(time.time() // 30)
-    return any(hmac.compare_digest(code, totp_for_step(TOTP_SECRET, timestep + offset)) for offset in (-1, 0, 1))
+    timestep = int(time.time() // TOTP_STEP_SECONDS)
+    for offset in (-1, 0, 1):
+        candidate_step = timestep + offset
+        if hmac.compare_digest(code, totp_for_step(TOTP_SECRET, candidate_step)):
+            return candidate_step
+    return None
+
+
+def totp_actor(request: Request) -> str:
+    return getattr(request.state, "auth_actor", None) or "unknown"
+
+
+def ensure_totp_not_locked(actor: str, now: float) -> None:
+    with _totp_lock:
+        locked_until = _totp_lockouts.get(actor, 0.0)
+        if locked_until <= now:
+            if locked_until:
+                _totp_lockouts.pop(actor, None)
+            return
+        retry_after = max(1, round(locked_until - now))
+    raise HTTPException(
+        status_code=429,
+        detail="Too many invalid TOTP attempts. Try again shortly.",
+        headers={"Retry-After": str(retry_after)},
+    )
+
+
+def record_totp_failure(actor: str, now: float) -> None:
+    cutoff = now - TOTP_FAILURE_WINDOW_SECONDS
+    with _totp_lock:
+        failures = _totp_failures.setdefault(actor, deque())
+        while failures and failures[0] <= cutoff:
+            failures.popleft()
+        failures.append(now)
+        if len(failures) < TOTP_FAILURE_LIMIT:
+            return
+
+        lockout_count = _totp_lockout_counts.get(actor, 0) + 1
+        lockout_seconds = min(TOTP_LOCKOUT_BASE_SECONDS * (2 ** (lockout_count - 1)), TOTP_LOCKOUT_MAX_SECONDS)
+        _totp_lockout_counts[actor] = lockout_count
+        _totp_lockouts[actor] = now + lockout_seconds
+        failures.clear()
+
+
+def record_totp_success(actor: str) -> None:
+    with _totp_lock:
+        _totp_failures.pop(actor, None)
+        _totp_lockouts.pop(actor, None)
+        _totp_lockout_counts.pop(actor, None)
+
+
+def consume_totp_step(actor: str, timestep: int, code: str, now: float) -> bool:
+    key = (actor, timestep, hashlib.sha256(code.encode("utf-8")).hexdigest())
+    cutoff = now - TOTP_USED_RETENTION_SECONDS
+    with _totp_lock:
+        for used_key, used_at in list(_used_totp_steps.items()):
+            if used_at <= cutoff:
+                _used_totp_steps.pop(used_key, None)
+        if key in _used_totp_steps:
+            return False
+        _used_totp_steps[key] = now
+        return True
 
 
 def totp_for_step(secret: str, timestep: int) -> str:
