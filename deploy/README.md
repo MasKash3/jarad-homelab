@@ -53,7 +53,10 @@ The installed Caddy block is:
 <device.tailnet.ts.net>:8444 {
     tls /certs/<device.tailnet.ts.net>.crt /certs/<device.tailnet.ts.net>.key
 
-    reverse_proxy /api/* localhost:8443
+    reverse_proxy /api/* localhost:8443 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+    }
     reverse_proxy localhost:5178
 }
 ```
