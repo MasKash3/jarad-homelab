@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .audit import audit_event
 from .auth import require_token, verify_action_auth, verify_totp_for_actor
-from .config import LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
+from .config import ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP, LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
 from .device_tokens import create_device_token, list_device_tokens, revoke_device_token
 from .docker import docker_action, docker_logs
 from .metrics import read_backup_state, read_cpu_pct, read_disk, read_raid_state, read_ram_pct, read_temp_c, read_uptime
@@ -51,10 +51,17 @@ def diagnostic_state(value: str) -> str:
 
 
 def require_credential_management_auth(totp_code: str | None, request: Request, *, consume: bool) -> None:
-    if not list_registered_credentials():
+    credentials_exist = bool(list_registered_credentials())
+    if credentials_exist or TOTP_SECRET:
+        if not verify_totp_for_actor(totp_code or "", request, consume=consume):
+            raise HTTPException(status_code=401, detail="TOTP is required to manage passkeys")
         return
-    if not verify_totp_for_actor(totp_code or "", request, consume=consume):
-        raise HTTPException(status_code=401, detail="TOTP is required to manage passkeys")
+    if ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP:
+        return
+    raise HTTPException(
+        status_code=403,
+        detail="First passkey enrollment requires TOTP or explicit server-side bootstrap mode",
+    )
 
 
 @router.get("/health")
