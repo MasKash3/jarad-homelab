@@ -78,6 +78,12 @@ table inet jarad_dns_access {{
     ip daddr {server_ip} tcp dport 53 ip saddr {lan_subnet} jump dns_clients
   }}
 
+  chain forward {{
+    type filter hook forward priority -5; policy accept;
+    ip saddr {lan_subnet} udp dport 53 jump dns_clients
+    ip saddr {lan_subnet} tcp dport 53 jump dns_clients
+  }}
+
   chain dns_clients {{
     {allowed_block}
     log prefix "JARAD_DNS_BLOCK " flags all
