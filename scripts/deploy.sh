@@ -166,12 +166,78 @@ fi
 
 require_command ssh
 require_command scp
+require_command sha256sum
 frontend_path="$repo_root/frontend"
 backend_path="$repo_root/backend"
 server_scripts_path="$repo_root/scripts/server"
 systemd_path="$repo_root/deploy/systemd"
 caddy_path="$repo_root/deploy/caddy"
 remote="${user_name}@${host_name}"
+manifest_file="$(mktemp)"
+trap 'rm -f "$manifest_file"' EXIT
+
+append_manifest_file() {
+  local local_file="$1"
+  local remote_path="$2"
+  local digest
+
+  if [[ ! -f "$local_file" ]]; then
+    return
+  fi
+
+  digest="$(sha256sum "$local_file" | awk '{print $1}')"
+  printf '%s  %s\n' "$digest" "$remote_path" >> "$manifest_file"
+}
+
+append_manifest_tree() {
+  local local_dir="$1"
+  local remote_prefix="$2"
+  local rel_path
+
+  if [[ ! -d "$local_dir" ]]; then
+    return
+  fi
+
+  while IFS= read -r -d '' rel_path; do
+    rel_path="${rel_path#./}"
+    append_manifest_file "$local_dir/$rel_path" "$remote_prefix/$rel_path"
+  done < <(cd "$local_dir" && find . -type f -print0 | sort -z)
+}
+
+build_deploy_manifest() {
+  : > "$manifest_file"
+
+  if [[ "$backend_only" != true ]]; then
+    append_manifest_tree "$frontend_path" "frontend"
+  fi
+
+  if [[ "$frontend_only" != true ]]; then
+    append_manifest_tree "$backend_path/jarad_backend" "backend/jarad_backend"
+    append_manifest_file "$backend_path/requirements.txt" "backend/requirements.txt"
+    append_manifest_file "$backend_path/requirements.lock" "backend/requirements.lock"
+    append_manifest_file "$backend_path/README.md" "backend/README.md"
+    append_manifest_file "$server_scripts_path/restart-backend.sh" "scripts/server/restart-backend.sh"
+    append_manifest_file "$server_scripts_path/install-systemd.sh" "scripts/server/install-systemd.sh"
+    append_manifest_file "$server_scripts_path/install-caddy-route.sh" "scripts/server/install-caddy-route.sh"
+    append_manifest_file "$server_scripts_path/jarad-dns-access" "scripts/server/jarad-dns-access"
+    append_manifest_file "$systemd_path/jarad-backend.service" "deploy/systemd/jarad-backend.service"
+    append_manifest_file "$systemd_path/jarad-frontend.service" "deploy/systemd/jarad-frontend.service"
+    append_manifest_file "$caddy_path/jarad.Caddyfile" "deploy/caddy/jarad.Caddyfile"
+  elif [[ "$install_caddy" == true ]]; then
+    append_manifest_file "$server_scripts_path/install-caddy-route.sh" "scripts/server/install-caddy-route.sh"
+    append_manifest_file "$caddy_path/jarad.Caddyfile" "deploy/caddy/jarad.Caddyfile"
+  fi
+}
+
+verify_deploy_manifest() {
+  if [[ ! -s "$manifest_file" ]]; then
+    return
+  fi
+
+  echo "Verifying deployed file hashes..."
+  run scp "$manifest_file" "$remote:$remote_root/deploy/jarad-deploy.sha256"
+  run ssh "$remote" "cd $remote_root && sha256sum -c deploy/jarad-deploy.sha256"
+}
 
 if [[ ! -d "$frontend_path" ]]; then
   echo "Missing frontend directory: $frontend_path" >&2
@@ -197,6 +263,11 @@ if [[ "$frontend_only" != true ]]; then
     "$backend_path/requirements.txt" \
     "$backend_path/README.md" \
     "$remote:$remote_root/backend/"
+  if [[ -f "$backend_path/requirements.lock" ]]; then
+    run scp "$backend_path/requirements.lock" "$remote:$remote_root/backend/requirements.lock"
+  else
+    run ssh "$remote" "rm -f $remote_root/backend/requirements.lock"
+  fi
 
   run scp "$server_scripts_path/restart-backend.sh" "$remote:$remote_root/scripts/server/restart-backend.sh"
   run scp "$server_scripts_path/install-systemd.sh" "$remote:$remote_root/scripts/server/install-systemd.sh"
@@ -219,9 +290,12 @@ if [[ "$install_caddy" == true && "$frontend_only" == true ]]; then
   run ssh "$remote" "chmod +x $remote_root/scripts/server/install-caddy-route.sh"
 fi
 
+build_deploy_manifest
+verify_deploy_manifest
+
 if [[ "$install_backend_deps" == true ]]; then
   echo "Installing backend dependencies..."
-  run ssh "$remote" "cd $remote_root/backend && if [ -f .env ]; then chmod 600 .env; fi && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt"
+  run ssh "$remote" "cd $remote_root/backend && if [ -f .env ]; then chmod 600 .env; fi && python3 -m venv .venv && . .venv/bin/activate && if [ -f requirements.lock ]; then pip install --require-hashes -r requirements.lock; else pip install -r requirements.txt; fi"
 fi
 
 if [[ "$install_services" == true ]]; then

@@ -9,6 +9,7 @@ from typing import Any
 
 from .command import run_command
 from .config import DB_PATH, DNS_ACCESS_ENABLED, DNS_ACCESS_HELPER, DNS_ACCESS_LAN_SUBNET, DNS_ACCESS_SERVER_IP
+from .file_security import ensure_owner_only_file
 
 
 VALID_STATUSES = {"pending", "approved", "denied"}
@@ -31,6 +32,7 @@ def connect() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
+    ensure_owner_only_file(DB_PATH)
     return connection
 
 

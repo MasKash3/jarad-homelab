@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import secrets
 import sqlite3
+from hashlib import sha256
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from .config import BROWSER_SESSION_TTL_MINUTES, DB_PATH, DEVICE_TOKEN_TTL_DAYS
+from .file_security import ensure_owner_only_file
 
 
 CHALLENGE_TTL_SECONDS = 180
@@ -25,6 +27,10 @@ def parse_iso(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
+def hash_action_token(token: str) -> str:
+    return sha256(token.encode("utf-8")).hexdigest()
+
+
 class WebAuthnStore:
     def __init__(self, db_path: Path = DB_PATH) -> None:
         self.db_path = db_path
@@ -34,6 +40,7 @@ class WebAuthnStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
+        ensure_owner_only_file(self.db_path)
         return connection
 
     def init(self) -> None:
@@ -137,6 +144,7 @@ class WebAuthnStore:
             db.execute("CREATE INDEX IF NOT EXISTS idx_browser_sessions_token_hash ON browser_sessions(token_hash)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_browser_sessions_device_id ON browser_sessions(device_id)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_browser_sessions_expires_at ON browser_sessions(expires_at)")
+            self.cleanup_expired_auth_rows(db)
 
     def ensure_device_token_columns(self, db: sqlite3.Connection) -> None:
         columns = {row["name"] for row in db.execute("PRAGMA table_info(device_tokens)").fetchall()}
@@ -182,6 +190,7 @@ class WebAuthnStore:
 
     def consume_challenge(self, challenge_id: str, purpose: str) -> dict[str, Any] | None:
         now = utc_now()
+        now_iso = iso(now)
         with self.connect() as db:
             row = db.execute(
                 """
@@ -192,7 +201,19 @@ class WebAuthnStore:
             ).fetchone()
             if not row or parse_iso(row["expires_at"]) <= now:
                 return None
-            db.execute("UPDATE webauthn_challenges SET used_at = ? WHERE challenge_id = ?", (iso(now), challenge_id))
+            result = db.execute(
+                """
+                UPDATE webauthn_challenges
+                SET used_at = ?
+                WHERE challenge_id = ?
+                  AND purpose = ?
+                  AND used_at IS NULL
+                  AND expires_at > ?
+                """,
+                (now_iso, challenge_id, purpose, now_iso),
+            )
+            if result.rowcount != 1:
+                return None
             return dict(row)
 
     def add_credential(
@@ -251,33 +272,42 @@ class WebAuthnStore:
     def create_action_authorization(self, *, action_id: str, service_id: str | None) -> str:
         now = utc_now()
         token = secrets.token_urlsafe(32)
+        token_hash = hash_action_token(token)
         with self.connect() as db:
+            self.cleanup_expired_auth_rows(db)
             db.execute(
                 """
                 INSERT INTO action_authorizations
                     (token, action_id, service_id, created_at, expires_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (token, action_id, service_id, iso(now), iso(now + timedelta(seconds=ACTION_AUTH_TTL_SECONDS))),
+                (token_hash, action_id, service_id, iso(now), iso(now + timedelta(seconds=ACTION_AUTH_TTL_SECONDS))),
             )
         return token
 
     def consume_action_authorization(self, *, token: str, action_id: str, service_id: str | None) -> bool:
         now = utc_now()
+        now_iso = iso(now)
+        token_hash = hash_action_token(token)
         with self.connect() as db:
-            row = db.execute(
+            result = db.execute(
                 """
-                SELECT * FROM action_authorizations
-                WHERE token = ? AND action_id = ? AND used_at IS NULL
+                UPDATE action_authorizations
+                SET used_at = ?
+                WHERE token = ?
+                  AND action_id = ?
+                  AND used_at IS NULL
+                  AND expires_at > ?
+                  AND ((service_id IS NULL AND ? IS NULL) OR service_id = ?)
                 """,
-                (token, action_id),
-            ).fetchone()
-            if not row or parse_iso(row["expires_at"]) <= now:
-                return False
-            if row["service_id"] and row["service_id"] != service_id:
-                return False
-            db.execute("UPDATE action_authorizations SET used_at = ? WHERE token = ?", (iso(now), token))
-            return True
+                (now_iso, token_hash, action_id, now_iso, service_id, service_id),
+            )
+            return result.rowcount == 1
+
+    def cleanup_expired_auth_rows(self, db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        db.execute("DELETE FROM webauthn_challenges WHERE expires_at <= ?", (now,))
+        db.execute("DELETE FROM action_authorizations WHERE expires_at <= ?", (now,))
 
     def add_audit_event(
         self,
