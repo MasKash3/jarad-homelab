@@ -1037,20 +1037,17 @@ button {
 }
 
 @media (max-width: 520px) {
-  .device-token-card,
-  .dns-client-card {
+  .device-token-card {
     grid-template-columns: 1fr;
     align-items: start;
   }
 
-  .device-token-actions,
-  .dns-client-actions {
+  .device-token-actions {
     width: 100%;
     justify-content: stretch;
   }
 
-  .device-token-actions .text-button,
-  .dns-client-actions .text-button {
+  .device-token-actions .text-button {
     flex: 1;
     min-height: 42px;
   }
