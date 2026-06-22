@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.20.6';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.20.6';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.20.6';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.20.6';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.20.6';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.22.1';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.22.1';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.22.1';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.22.1';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.22.1';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -17,6 +17,9 @@ let passkeyCredentials = [];
 let deviceTokens = [];
 let deviceTokenMessage = "";
 let deviceTokenMessageState = "muted";
+let dnsAccess = createNoDataState().dnsAccess;
+let dnsAccessMessage = "";
+let dnsAccessMessageState = "muted";
 let pendingTotpResolve = null;
 let state = createNoDataState();
 let connectionState = {
@@ -233,6 +236,67 @@ function renderAlerts() {
       <strong>${escapeHtml(value)}</strong>
     </div>
   `).join("");
+  renderDnsAccess();
+}
+
+function renderDnsAccess() {
+  const clients = dnsAccess.clients || [];
+  const pendingCount = dnsAccess.summary?.pending || 0;
+  const approvedCount = dnsAccess.summary?.approved || 0;
+  const stateLabel = dnsAccess.enabled ? `${approvedCount} approved` : "Disabled";
+  $("#dnsAccessState").textContent = pendingCount ? `${pendingCount} pending` : stateLabel;
+  $("#dnsAccessState").className = `pill ${pendingCount ? "warn" : dnsAccess.enabled ? "good" : "muted"}`;
+  $("#dnsAccessHelp").textContent = dnsAccessMessage || `${dnsAccess.serverIp || "DNS server"} access list for ${dnsAccess.lanSubnet || "configured LAN"}.`;
+  $("#dnsAccessHelp").className = `config-help ${dnsAccessMessageState}`;
+
+  const orderedClients = [...clients].sort((left, right) => {
+    const rank = { pending: 0, expired: 1, approved: 2, denied: 3 };
+    return (rank[left.effectiveStatus] ?? 4) - (rank[right.effectiveStatus] ?? 4)
+      || String(right.lastSeenAt || "").localeCompare(String(left.lastSeenAt || ""));
+  });
+
+  $("#dnsClientList").innerHTML = orderedClients.map((client) => {
+    const status = client.effectiveStatus || client.status || "pending";
+    const clientLabel = client.hostname || client.clientIp;
+    const meta = [
+      client.hostname ? client.clientIp : "",
+      client.macAddress || "",
+      client.approvedUntil ? `expires ${formatFuture(client.approvedUntil)}` : "",
+      client.lastSeenAt ? `last seen ${formatUpdated(client.lastSeenAt)}` : ""
+    ].filter(Boolean).join(" / ");
+    const actions = status === "approved"
+      ? `<button class="text-button" type="button" data-dns-action="revoke" data-client-ip="${escapeAttr(client.clientIp)}">Revoke</button>`
+      : status === "denied"
+      ? `<button class="text-button" type="button" data-dns-action="approve-permanent" data-client-ip="${escapeAttr(client.clientIp)}">Approve</button>`
+      : `
+        <button class="text-button" type="button" data-dns-action="approve-2h" data-client-ip="${escapeAttr(client.clientIp)}">2h</button>
+        <button class="text-button" type="button" data-dns-action="approve-permanent" data-client-ip="${escapeAttr(client.clientIp)}">Always</button>
+        <button class="text-button" type="button" data-dns-action="deny" data-client-ip="${escapeAttr(client.clientIp)}">Deny</button>
+      `;
+    return `
+      <article class="config-card dns-client-card">
+        <div>
+          <strong>${escapeHtml(clientLabel)}</strong>
+          <p>${escapeHtml(meta || "No recent DNS attempts recorded")}</p>
+        </div>
+        <div class="dns-client-actions">
+          <span class="pill ${escapeAttr(statusTone(status))}">${escapeHtml(status)}</span>
+          ${actions}
+        </div>
+      </article>
+    `;
+  }).join("") || emptyState("No DNS clients recorded yet.");
+
+  $$("#dnsClientList [data-dns-action]").forEach((button) => {
+    button.addEventListener("click", () => runDnsClientAction(button.dataset.clientIp, button.dataset.dnsAction));
+  });
+}
+
+function statusTone(status) {
+  if (status === "approved") return "good";
+  if (status === "denied" || status === "expired") return "bad";
+  if (status === "pending") return "warn";
+  return "muted";
 }
 
 function renderAdmin() {
@@ -563,24 +627,83 @@ async function executePendingAction() {
       handledSensitiveView = true;
     }
     if (!handledSensitiveView) {
-      await api.executeAction(completedAction, completedAuth);
+      if (completedAction.kind?.startsWith("dns-")) {
+        await executeDnsClientAction(completedAction, completedAuth);
+      } else {
+        await api.executeAction(completedAction, completedAuth);
+      }
       state.logs.unshift({
         level: "info",
         service: "admin",
         time: "Now",
         message: `${completedAction.title} requested from mobile app`
       });
-      await refreshState({ preserveServiceSheet: true });
-      renderInlineNotice(`${completedAction.title} completed. Status refreshed.`, "good");
+      if (completedAction.kind?.startsWith("dns-")) {
+        await refreshDnsAccess();
+      } else {
+        await refreshState({ preserveServiceSheet: true });
+        renderInlineNotice(`${completedAction.title} completed. Status refreshed.`, "good");
+      }
     }
   } catch (error) {
     addAudit(completedAction.title, completedAction.target, "failure", error.message);
-    renderInlineNotice(`Action failed: ${error.message}`);
+    if (completedAction.kind?.startsWith("dns-")) {
+      dnsAccessMessage = error.message;
+      dnsAccessMessageState = "bad";
+      renderDnsAccess();
+    } else {
+      renderInlineNotice(`Action failed: ${error.message}`);
+    }
   }
 
   pendingAction = null;
   pendingService = null;
   pendingAuth = null;
+}
+
+async function executeDnsClientAction(action, auth) {
+  let result = null;
+  if (action.kind === "dns-approve") {
+    result = await api.approveDnsClient(action.clientIp, action.duration, auth);
+    dnsAccessMessage = `${action.clientIp} approved ${action.duration === "permanent" ? "permanently" : `for ${action.duration}`}.`;
+  } else if (action.kind === "dns-deny") {
+    result = await api.denyDnsClient(action.clientIp, auth);
+    dnsAccessMessage = `${action.clientIp} denied.`;
+  } else if (action.kind === "dns-revoke") {
+    result = await api.revokeDnsClient(action.clientIp, auth);
+    dnsAccessMessage = `${action.clientIp} revoked.`;
+  }
+  if (result?.firewall?.enabled && !result.firewall.applied) {
+    dnsAccessMessage = `${dnsAccessMessage} Firewall rules were not applied: ${result.firewall.detail || "helper failed"}.`;
+    dnsAccessMessageState = "warn";
+  } else {
+    dnsAccessMessageState = "good";
+  }
+  addAudit(action.title, "dns-access", "success", action.clientIp);
+}
+
+function runDnsClientAction(clientIp, actionName) {
+  const actionMap = {
+    "approve-2h": { kind: "dns-approve", title: "Approve DNS Client", detail: "Temporary DNS access", duration: "2h" },
+    "approve-permanent": { kind: "dns-approve", title: "Approve DNS Client", detail: "Permanent DNS access", duration: "permanent" },
+    deny: { kind: "dns-deny", title: "Deny DNS Client", detail: "Block DNS access" },
+    revoke: { kind: "dns-revoke", title: "Revoke DNS Client", detail: "Remove DNS approval" }
+  };
+  const action = actionMap[actionName];
+  if (!action) return;
+  pendingService = null;
+  pendingAction = {
+    id: `${action.kind.replace("dns-", "dns-")}-${clientIp}`,
+    title: `${action.title} ${clientIp}`,
+    target: clientIp,
+    serviceId: "dns-access",
+    clientIp,
+    kind: action.kind,
+    duration: action.duration,
+    detail: action.detail,
+    danger: action.kind !== "dns-approve"
+  };
+  openAuthSheet();
 }
 
 function renderAuthError(message) {
@@ -606,6 +729,7 @@ function setActiveScreen(screenName, options = {}) {
 async function refreshState(options = {}) {
   const openServiceId = options.preserveServiceSheet && $("#serviceSheet").open ? activeServiceId : null;
   state = await api.getState();
+  dnsAccess = state.dnsAccess || dnsAccess;
   state.updatedAt = new Date(state.updatedAt || Date.now());
   render();
   if (openServiceId) {
@@ -616,6 +740,16 @@ async function refreshState(options = {}) {
       activeServiceId = null;
     }
   }
+}
+
+async function refreshDnsAccess() {
+  try {
+    dnsAccess = await api.listDnsClients();
+  } catch (error) {
+    dnsAccessMessage = error.message;
+    dnsAccessMessageState = "bad";
+  }
+  renderDnsAccess();
 }
 
 function addAudit(action, target, status, details = "") {
@@ -921,3 +1055,4 @@ bindEvents();
 refreshState();
 refreshPasskeys();
 refreshDeviceTokens();
+refreshDnsAccess();

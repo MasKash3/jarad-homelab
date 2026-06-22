@@ -201,13 +201,14 @@ if [[ "$frontend_only" != true ]]; then
   run scp "$server_scripts_path/restart-backend.sh" "$remote:$remote_root/scripts/server/restart-backend.sh"
   run scp "$server_scripts_path/install-systemd.sh" "$remote:$remote_root/scripts/server/install-systemd.sh"
   run scp "$server_scripts_path/install-caddy-route.sh" "$remote:$remote_root/scripts/server/install-caddy-route.sh"
+  run scp "$server_scripts_path/jarad-dns-access" "$remote:$remote_root/scripts/server/jarad-dns-access"
   run scp \
     "$systemd_path/jarad-backend.service" \
     "$systemd_path/jarad-frontend.service" \
     "$remote:$remote_root/deploy/systemd/"
   run scp "$caddy_path/jarad.Caddyfile" "$remote:$remote_root/deploy/caddy/jarad.Caddyfile"
 
-  run ssh "$remote" "chmod +x $remote_root/scripts/server/restart-backend.sh $remote_root/scripts/server/install-systemd.sh $remote_root/scripts/server/install-caddy-route.sh"
+  run ssh "$remote" "chmod +x $remote_root/scripts/server/restart-backend.sh $remote_root/scripts/server/install-systemd.sh $remote_root/scripts/server/install-caddy-route.sh $remote_root/scripts/server/jarad-dns-access"
   run ssh "$remote" "if [ -f $remote_root/backend/.env ]; then chmod 600 $remote_root/backend/.env; fi"
 fi
 

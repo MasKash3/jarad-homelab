@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+command="${1:-}"
+
+if [[ "$command" == "detect" ]]; then
+  if command -v journalctl >/dev/null 2>&1; then
+    journalctl --dmesg --grep JARAD_DNS_BLOCK --no-pager -n 200 2>/dev/null
+  elif [[ -r /var/log/jarad-dns-access.log ]]; then
+    cat /var/log/jarad-dns-access.log
+  else
+    true
+  fi | awk '
+    /JARAD_DNS_BLOCK/ {
+      ip = ""
+      for (i = 1; i <= NF; i++) {
+        if ($i ~ /^SRC=/) {
+          ip = substr($i, 5)
+        }
+      }
+      if (ip != "") {
+        seen[ip] = 1
+      }
+    }
+    END {
+      printf "["
+      first = 1
+      for (ip in seen) {
+        if (!first) printf ","
+        printf "{\"clientIp\":\"%s\"}", ip
+        first = 0
+      }
+      printf "]"
+    }
+  '
+  exit 0
+fi
+
+if [[ "$command" != "apply" ]]; then
+  echo "Usage: jarad-dns-access apply '<json>' | jarad-dns-access detect" >&2
+  exit 2
+fi
+
+payload="${2:-}"
+if [[ -z "$payload" ]]; then
+  echo "Missing JSON payload" >&2
+  exit 2
+fi
+
+python3 - "$payload" <<'PY'
+import ipaddress
+import json
+import shutil
+import subprocess
+import sys
+
+payload = json.loads(sys.argv[1])
+lan_subnet = ipaddress.ip_network(payload["lanSubnet"], strict=False)
+server_ip = ipaddress.ip_address(payload["serverIp"])
+allowed_ips = [ipaddress.ip_address(ip) for ip in payload.get("allowedIps", [])]
+
+if server_ip not in lan_subnet:
+    raise SystemExit("serverIp is outside lanSubnet")
+for ip in allowed_ips:
+    if ip not in lan_subnet:
+        raise SystemExit(f"allowed IP {ip} is outside lanSubnet")
+
+if not shutil.which("nft"):
+    raise SystemExit("nft command is unavailable")
+
+allowed = ", ".join(str(ip) for ip in sorted(allowed_ips))
+allowed_block = f"ip saddr {{ {allowed} }} accept" if allowed else ""
+rules = f"""
+table inet jarad_dns_access {{
+  chain input {{
+    type filter hook input priority -5; policy accept;
+    ip daddr {server_ip} udp dport 53 ip saddr {lan_subnet} jump dns_clients
+    ip daddr {server_ip} tcp dport 53 ip saddr {lan_subnet} jump dns_clients
+  }}
+
+  chain dns_clients {{
+    {allowed_block}
+    log prefix "JARAD_DNS_BLOCK " flags all
+    reject
+  }}
+}}
+"""
+
+subprocess.run(["nft", "delete", "table", "inet", "jarad_dns_access"], check=False, capture_output=True, text=True)
+result = subprocess.run(["nft", "-f", "-"], input=rules, check=False, capture_output=True, text=True)
+if result.returncode != 0:
+    sys.stderr.write(result.stderr)
+    raise SystemExit(result.returncode)
+print(f"Applied DNS access rules for {len(allowed_ips)} approved client(s)")
+PY

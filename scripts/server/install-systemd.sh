@@ -37,6 +37,10 @@ for service in jarad-backend.service jarad-frontend.service; do
   sudo install -m 0644 "/tmp/$service" "/etc/systemd/system/$service"
 done
 
+if [ -f "$REMOTE_ROOT/scripts/server/jarad-dns-access" ]; then
+  sudo install -m 0755 "$REMOTE_ROOT/scripts/server/jarad-dns-access" /usr/local/sbin/jarad-dns-access
+fi
+
 sudo systemctl daemon-reload
 sudo systemctl reset-failed
 sudo systemctl enable --now jarad-backend.service

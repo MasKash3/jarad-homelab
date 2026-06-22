@@ -11,6 +11,7 @@ from .audit import audit_event
 from .auth import require_device_token, require_token, verify_action_auth, verify_totp_for_actor
 from .config import ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP, LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
 from .device_tokens import create_browser_session, create_device_token, list_device_tokens, revoke_device_token, rotate_device_token
+from .dns_access import approve_client, deny_client, list_clients as list_dns_clients, revoke_client
 from .docker import docker_action, docker_logs
 from .metrics import read_backup_state, read_cpu_pct, read_disk, read_raid_state, read_ram_pct, read_temp_c, read_uptime
 from .models import (
@@ -18,6 +19,7 @@ from .models import (
     DeviceTokenRegisterRequest,
     DeviceTokenRevokeRequest,
     DeviceTokenRotateRequest,
+    DnsClientApproveRequest,
     TotpCheckRequest,
     WebAuthnAuthenticateOptionsRequest,
     WebAuthnAuthenticateVerifyRequest,
@@ -370,6 +372,107 @@ def mobile_state() -> dict[str, Any]:
         "alerts": alerts_for(services, disk_pct, backup["state"]),
         "network": network_state(),
     }
+
+
+@router.get("/api/dns/clients", dependencies=protected)
+def dns_clients() -> dict[str, Any]:
+    return list_dns_clients()
+
+
+@router.post("/api/dns/clients/{client_ip}/approve", dependencies=protected)
+def dns_client_approve(client_ip: str, payload: DnsClientApproveRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="dns-access-action", limit=12, window_seconds=60)
+    action_id = f"dns-approve-{client_ip}"
+    method = (payload.authMethod or "").lower()
+    try:
+        verify_action_auth(payload, action_id, "dns-access", request)
+        client, apply_result = approve_client(client_ip, payload.duration)
+    except ValueError as exc:
+        audit_event("dns_access.approve", "failure", request=request, action_id=action_id, service_id="dns-access", details={"detail": str(exc)})
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException as exc:
+        audit_event(
+            action_auth_event_type(method),
+            "failure",
+            request=request,
+            action_id=action_id,
+            service_id="dns-access",
+            details={"method": method or "missing", "status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise
+    audit_event(
+        "dns_access.approve",
+        "success",
+        request=request,
+        action_id=action_id,
+        service_id="dns-access",
+        details={"client_ip": client_ip, "duration": payload.duration, "apply": apply_result},
+    )
+    return {"status": "approved", "client": client, "firewall": apply_result}
+
+
+@router.post("/api/dns/clients/{client_ip}/deny", dependencies=protected)
+def dns_client_deny(client_ip: str, payload: ActionRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="dns-access-action", limit=12, window_seconds=60)
+    action_id = f"dns-deny-{client_ip}"
+    method = (payload.authMethod or "").lower()
+    try:
+        verify_action_auth(payload, action_id, "dns-access", request)
+        client, apply_result = deny_client(client_ip)
+    except ValueError as exc:
+        audit_event("dns_access.deny", "failure", request=request, action_id=action_id, service_id="dns-access", details={"detail": str(exc)})
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException as exc:
+        audit_event(
+            action_auth_event_type(method),
+            "failure",
+            request=request,
+            action_id=action_id,
+            service_id="dns-access",
+            details={"method": method or "missing", "status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise
+    audit_event(
+        "dns_access.deny",
+        "success",
+        request=request,
+        action_id=action_id,
+        service_id="dns-access",
+        details={"client_ip": client_ip, "apply": apply_result},
+    )
+    return {"status": "denied", "client": client, "firewall": apply_result}
+
+
+@router.post("/api/dns/clients/{client_ip}/revoke", dependencies=protected)
+def dns_client_revoke(client_ip: str, payload: ActionRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="dns-access-action", limit=12, window_seconds=60)
+    action_id = f"dns-revoke-{client_ip}"
+    method = (payload.authMethod or "").lower()
+    try:
+        verify_action_auth(payload, action_id, "dns-access", request)
+        client, apply_result = revoke_client(client_ip)
+    except ValueError as exc:
+        audit_event("dns_access.revoke", "failure", request=request, action_id=action_id, service_id="dns-access", details={"detail": str(exc)})
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException as exc:
+        audit_event(
+            action_auth_event_type(method),
+            "failure",
+            request=request,
+            action_id=action_id,
+            service_id="dns-access",
+            details={"method": method or "missing", "status_code": exc.status_code, "detail": exc.detail},
+        )
+        raise
+    audit_event(
+        "dns_access.revoke",
+        "success",
+        request=request,
+        action_id=action_id,
+        service_id="dns-access",
+        details={"client_ip": client_ip, "apply": apply_result},
+    )
+    return {"status": "revoked", "client": client, "firewall": apply_result}
 
 
 @router.post("/api/services/{service_id}/logs", dependencies=protected)

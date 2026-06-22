@@ -27,6 +27,18 @@ export function createNoDataState(reason = "Connect to the Jarad backend to load
     },
     services: [],
     logs: [],
+    dnsAccess: {
+      enabled: false,
+      lanSubnet: "",
+      serverIp: "",
+      clients: [],
+      summary: {
+        pending: 0,
+        approved: 0,
+        denied: 0,
+        expired: 0
+      }
+    },
     alerts: [
       {
         state: "warn",

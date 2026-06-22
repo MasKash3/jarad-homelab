@@ -56,3 +56,7 @@ class DeviceTokenRevokeRequest(BaseModel):
 
 class DeviceTokenRotateRequest(BaseModel):
     totpCode: str
+
+
+class DnsClientApproveRequest(ActionRequest):
+    duration: str = "2h"

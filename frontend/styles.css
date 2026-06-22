@@ -223,7 +223,8 @@ button {
 }
 
 .metric-grid .no-data-panel,
-.launcher-grid .no-data-panel {
+.launcher-grid .no-data-panel,
+.dns-client-list .no-data-panel {
   grid-column: 1 / -1;
 }
 
@@ -1014,18 +1015,42 @@ button {
   min-width: 74px;
 }
 
+.dns-client-list {
+  display: grid;
+  gap: 9px;
+}
+
+.dns-client-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.dns-client-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dns-client-actions .text-button {
+  min-width: 58px;
+}
+
 @media (max-width: 520px) {
-  .device-token-card {
+  .device-token-card,
+  .dns-client-card {
     grid-template-columns: 1fr;
     align-items: start;
   }
 
-  .device-token-actions {
+  .device-token-actions,
+  .dns-client-actions {
     width: 100%;
     justify-content: stretch;
   }
 
-  .device-token-actions .text-button {
+  .device-token-actions .text-button,
+  .dns-client-actions .text-button {
     flex: 1;
     min-height: 42px;
   }

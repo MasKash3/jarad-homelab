@@ -281,6 +281,46 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
         actionAuthToken: auth.actionAuthToken
       })
     });
+  },
+  async listDnsClients() {
+    return request("/api/dns/clients");
+  },
+  async approveDnsClient(clientIp, duration, auth = {}) {
+    return request(`/api/dns/clients/${encodeURIComponent(clientIp)}/approve`, {
+      method: "POST",
+      body: JSON.stringify({
+        source: "mobile-pwa",
+        serviceId: "dns-access",
+        duration,
+        authMethod: auth.method,
+        totpCode: auth.totpCode,
+        actionAuthToken: auth.actionAuthToken
+      })
+    });
+  },
+  async denyDnsClient(clientIp, auth = {}) {
+    return request(`/api/dns/clients/${encodeURIComponent(clientIp)}/deny`, {
+      method: "POST",
+      body: JSON.stringify({
+        source: "mobile-pwa",
+        serviceId: "dns-access",
+        authMethod: auth.method,
+        totpCode: auth.totpCode,
+        actionAuthToken: auth.actionAuthToken
+      })
+    });
+  },
+  async revokeDnsClient(clientIp, auth = {}) {
+    return request(`/api/dns/clients/${encodeURIComponent(clientIp)}/revoke`, {
+      method: "POST",
+      body: JSON.stringify({
+        source: "mobile-pwa",
+        serviceId: "dns-access",
+        authMethod: auth.method,
+        totpCode: auth.totpCode,
+        actionAuthToken: auth.actionAuthToken
+      })
+    });
   }
 };
 
