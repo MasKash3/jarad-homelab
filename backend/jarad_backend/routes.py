@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import platform
+import re
 import socket
 from datetime import datetime, timezone
 from typing import Any
@@ -680,11 +681,11 @@ def service_log_row(line: str) -> dict[str, str]:
 
 
 def split_docker_log_line(line: str) -> tuple[str, str]:
-    raw_timestamp, separator, message = line.partition(" ")
-    if not separator or "T" not in raw_timestamp:
+    match = re.match(r"^(\d{4}-\d{2}-\d{2}T[^\s]+)\s+(.*)$", line)
+    if not match:
         return "Recent", line
 
-    return format_docker_timestamp(raw_timestamp), message
+    return format_docker_timestamp(match.group(1)), match.group(2)
 
 
 def format_docker_timestamp(raw_timestamp: str) -> str:

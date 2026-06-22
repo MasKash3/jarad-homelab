@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.22.6';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.22.6';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.22.6';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.22.6';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.22.6';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.22.7';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.22.7';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.22.7';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.22.7';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.22.7';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -651,7 +651,7 @@ async function executePendingAction() {
         await refreshDnsAccess();
       } else {
         await refreshState({ preserveServiceSheet: true });
-        renderInlineNotice(`${completedAction.title} completed. Status refreshed.`, "good");
+        renderInlineNotice(`${completedAction.title} completed.`, "good");
       }
     }
   } catch (error) {

@@ -126,9 +126,11 @@ def dns_ok() -> bool:
 def recent_logs(limit: int = 80) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     if BACKUP_LOG.exists():
+        last_time = "Recent"
         for line in tail_lines(BACKUP_LOG, limit):
+            last_time = backup_log_time(line) or last_time
             level = "error" if "error" in line.lower() or "failed" in line.lower() else "info"
-            rows.append({"level": level, "service": "backup", "time": backup_log_time(line), "message": line[-180:]})
+            rows.append({"level": level, "service": "backup", "time": last_time, "message": line[-180:]})
 
     if not rows:
         rows.append(
@@ -142,17 +144,22 @@ def recent_logs(limit: int = 80) -> list[dict[str, str]]:
     return rows[-limit:]
 
 
-def backup_log_time(line: str) -> str:
+def backup_log_time(line: str) -> str | None:
     match = re.search(
         r"(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{1,2})[:h](\d{2})",
         line,
     )
-    if not match:
-        return "Recent"
+    if match:
+        hour = int(match.group(4))
+        suffix = "AM" if hour < 12 else "PM"
+        return f"{match.group(2)} {match.group(3)} {hour % 12 or 12}:{match.group(5)} {suffix}"
 
-    hour = int(match.group(4))
-    suffix = "AM" if hour < 12 else "PM"
-    return f"{match.group(2)} {match.group(3)} {hour % 12 or 12}:{match.group(5)} {suffix}"
+    iso_match = re.search(r"(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2})", line)
+    if iso_match:
+        hour = int(iso_match.group(4))
+        suffix = "AM" if hour < 12 else "PM"
+        return f"{iso_match.group(2)}/{iso_match.group(3)} {hour % 12 or 12}:{iso_match.group(5)} {suffix}"
+    return None
 
 
 def network_state() -> list[list[str]]:

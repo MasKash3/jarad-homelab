@@ -89,19 +89,36 @@ def read_backup_state() -> dict[str, str]:
     quick = latest_matching(lines, ("Quick backup complete", "Quick backup completed"))
     full = latest_matching(lines, ("Full backup complete", "Full backup completed"))
     photos = latest_matching(lines, ("Photos backup complete", "Photos backup completed"))
+    latest_start = latest_matching_with_index(lines, ("Quick backup started", "Full backup started"))
+    latest_done = latest_matching_with_index(lines, ("Quick backup complete", "Quick backup completed", "Full backup complete", "Full backup completed", "Photos backup complete", "Photos backup completed"))
     failed = any("ERROR" in line or "failed" in line.lower() for line in lines[-30:])
     has_completion = bool(quick or full or photos)
+    running = bool(latest_start and (not latest_done or latest_start[0] > latest_done[0]))
+    running_label = running_backup_label(latest_start[1]) if latest_start else "Backup running"
     return {
-        "state": "Degraded" if failed else "Healthy" if has_completion else "Unknown",
-        "quick": format_backup_line(quick, "Quick") if quick else "No quick log",
-        "full": format_backup_line(full, "Full") if full else format_backup_line(photos, "Photos") if photos else "No full log",
+        "state": "Degraded" if failed else "Running" if running else "Healthy" if has_completion else "Unknown",
+        "quick": running_label if running and "Quick" in running_label else format_backup_line(quick, "Quick") if quick else "No quick log",
+        "full": running_label if running and "Full" in running_label else format_backup_line(full, "Full") if full else format_backup_line(photos, "Photos") if photos else "No full log",
         "cloud": format_backup_line(photos, "Photos") if photos else "Cloud backup unchecked",
-        "next": "Cron schedule",
+        "next": "Running now" if running else "Cron schedule",
     }
 
 
 def latest_matching(lines: list[str], phrases: tuple[str, ...]) -> str | None:
     return next((line for line in reversed(lines) if any(phrase in line for phrase in phrases)), None)
+
+
+def latest_matching_with_index(lines: list[str], phrases: tuple[str, ...]) -> tuple[int, str] | None:
+    for index in range(len(lines) - 1, -1, -1):
+        line = lines[index]
+        if any(phrase in line for phrase in phrases):
+            return index, line
+    return None
+
+
+def running_backup_label(line: str) -> str:
+    label = "Full" if "Full backup" in line else "Quick"
+    return format_backup_line(line, f"{label} running")
 
 
 def format_backup_line(line: str | None, label: str) -> str:
@@ -120,5 +137,12 @@ def format_backup_line(line: str | None, label: str) -> str:
         suffix = "AM" if hour < 12 else "PM"
         hour_12 = hour % 12 or 12
         return f"{label} {match.group(2)} {match.group(3)} {hour_12}:{minute} {suffix}"
+
+    iso_match = re.search(r"(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2})", timestamp)
+    if iso_match:
+        hour = int(iso_match.group(4))
+        suffix = "AM" if hour < 12 else "PM"
+        hour_12 = hour % 12 or 12
+        return f"{label} {iso_match.group(2)}/{iso_match.group(3)} {hour_12}:{iso_match.group(5)} {suffix}"
 
     return f"{label} {timestamp[-24:] if len(timestamp) > 24 else timestamp}"
