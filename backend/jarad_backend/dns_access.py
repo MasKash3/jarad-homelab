@@ -249,7 +249,7 @@ def get_client(client_ip: str) -> dict[str, Any] | None:
 def collect_detected_clients() -> dict[str, Any]:
     if not DNS_ACCESS_ENABLED:
         return {"enabled": False, "processed": 0, "error": None}
-    result = run_command([DNS_ACCESS_HELPER, "detect"], timeout=5)
+    result = run_command(helper_command("detect"), timeout=5)
     if result is None:
         return {"enabled": True, "processed": 0, "error": "DNS access helper unavailable"}
     if result.returncode != 0:
@@ -286,7 +286,7 @@ def apply_firewall_rules() -> dict[str, Any]:
             "allowedIps": allowed_ips,
         }
     )
-    result = run_command([DNS_ACCESS_HELPER, "apply", payload], timeout=10)
+    result = run_command(helper_command("apply", payload), timeout=10)
     if result is None:
         return {"enabled": True, "applied": False, "allowedIps": allowed_ips, "detail": "DNS access helper unavailable"}
     if result.returncode != 0:
@@ -325,6 +325,10 @@ def clean_text(value: str | None) -> str | None:
         return None
     cleaned = re.sub(r"[^A-Za-z0-9_.: -]", "", str(value)).strip()
     return cleaned[:120] or None
+
+
+def helper_command(command: str, *args: str) -> list[str]:
+    return ["sudo", "-n", DNS_ACCESS_HELPER, command, *args]
 
 
 init()

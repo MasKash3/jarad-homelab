@@ -39,6 +39,12 @@ done
 
 if [ -f "$REMOTE_ROOT/scripts/server/jarad-dns-access" ]; then
   sudo install -m 0755 "$REMOTE_ROOT/scripts/server/jarad-dns-access" /usr/local/sbin/jarad-dns-access
+  sudo tee /etc/sudoers.d/jarad-dns-access >/dev/null <<EOF
+$SERVICE_USER ALL=(root) NOPASSWD: /usr/local/sbin/jarad-dns-access detect
+$SERVICE_USER ALL=(root) NOPASSWD: /usr/local/sbin/jarad-dns-access apply *
+EOF
+  sudo chmod 0440 /etc/sudoers.d/jarad-dns-access
+  sudo visudo -cf /etc/sudoers.d/jarad-dns-access >/dev/null
 fi
 
 sudo systemctl daemon-reload
