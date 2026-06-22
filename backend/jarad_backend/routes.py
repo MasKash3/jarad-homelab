@@ -11,7 +11,7 @@ from .audit import audit_event
 from .auth import require_device_token, require_token, verify_action_auth, verify_totp_for_actor
 from .config import ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP, LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
 from .device_tokens import create_browser_session, create_device_token, list_device_tokens, revoke_device_token, rotate_device_token
-from .dns_access import approve_client, deny_client, list_clients as list_dns_clients, revoke_client
+from .dns_access import approve_client, deny_client, list_clients as list_dns_clients, revoke_client, update_client_label
 from .docker import docker_action, docker_logs
 from .metrics import read_backup_state, read_cpu_pct, read_disk, read_raid_state, read_ram_pct, read_temp_c, read_uptime
 from .models import (
@@ -20,6 +20,7 @@ from .models import (
     DeviceTokenRevokeRequest,
     DeviceTokenRotateRequest,
     DnsClientApproveRequest,
+    DnsClientLabelRequest,
     TotpCheckRequest,
     WebAuthnAuthenticateOptionsRequest,
     WebAuthnAuthenticateVerifyRequest,
@@ -473,6 +474,24 @@ def dns_client_revoke(client_ip: str, payload: ActionRequest, request: Request) 
         details={"client_ip": client_ip, "apply": apply_result},
     )
     return {"status": "revoked", "client": client, "firewall": apply_result}
+
+
+@router.post("/api/dns/clients/{client_ip}/label", dependencies=protected)
+def dns_client_label(client_ip: str, payload: DnsClientLabelRequest, request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, bucket="dns-access-label", limit=20, window_seconds=60)
+    try:
+        client = update_client_label(client_ip, payload.displayName)
+    except ValueError as exc:
+        audit_event("dns_access.label", "failure", request=request, service_id="dns-access", details={"detail": str(exc)})
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_event(
+        "dns_access.label",
+        "success",
+        request=request,
+        service_id="dns-access",
+        details={"client_ip": client_ip, "has_display_name": bool(client.get("displayName"))},
+    )
+    return {"status": "updated", "client": client}
 
 
 @router.post("/api/services/{service_id}/logs", dependencies=protected)

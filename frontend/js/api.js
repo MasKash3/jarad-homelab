@@ -321,6 +321,12 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
         actionAuthToken: auth.actionAuthToken
       })
     });
+  },
+  async updateDnsClientLabel(clientIp, displayName) {
+    return request(`/api/dns/clients/${encodeURIComponent(clientIp)}/label`, {
+      method: "POST",
+      body: JSON.stringify({ displayName })
+    });
   }
 };
 

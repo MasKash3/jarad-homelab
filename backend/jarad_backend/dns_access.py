@@ -53,6 +53,9 @@ def init() -> None:
             )
             """
         )
+        columns = {row["name"] for row in db.execute("PRAGMA table_info(dns_clients)").fetchall()}
+        if "display_name" not in columns:
+            db.execute("ALTER TABLE dns_clients ADD COLUMN display_name TEXT")
         db.execute("CREATE INDEX IF NOT EXISTS idx_dns_clients_status ON dns_clients(status)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_dns_clients_last_seen_at ON dns_clients(last_seen_at)")
 
@@ -186,6 +189,25 @@ def revoke_client(client_ip: str) -> tuple[dict[str, Any], dict[str, Any]]:
     return get_client(client_ip) or {}, apply_result
 
 
+def update_client_label(client_ip: str, display_name: str | None) -> dict[str, Any]:
+    client_ip = validate_client_ip(client_ip)
+    cleaned_name = clean_text(display_name)
+    now = utc_now()
+    with connect() as db:
+        db.execute(
+            """
+            INSERT INTO dns_clients
+                (client_ip, display_name, status, first_seen_at, last_seen_at, source)
+            VALUES (?, ?, 'pending', ?, ?, 'manual')
+            ON CONFLICT(client_ip) DO UPDATE SET
+                display_name = excluded.display_name,
+                last_seen_at = excluded.last_seen_at
+            """,
+            (client_ip, cleaned_name, iso(now), iso(now)),
+        )
+    return get_client(client_ip) or {}
+
+
 def list_clients() -> dict[str, Any]:
     expire_clients()
     detected = collect_detected_clients()
@@ -306,12 +328,18 @@ def apply_firewall_rules() -> dict[str, Any]:
     return {"enabled": True, "applied": True, "allowedIps": allowed_ips, "detail": (result.stdout or "").strip()}
 
 
+def sync_firewall_state() -> dict[str, Any]:
+    expire_clients()
+    return apply_firewall_rules()
+
+
 def serialize_client(row: sqlite3.Row, now: datetime) -> dict[str, Any]:
     approved_until = parse_iso(row["approved_until"])
     expired = row["status"] == "approved" and approved_until is not None and approved_until <= now
     effective_status = "expired" if expired else row["status"]
     return {
         "clientIp": row["client_ip"],
+        "displayName": row["display_name"],
         "hostname": row["hostname"],
         "macAddress": row["mac_address"],
         "status": row["status"],

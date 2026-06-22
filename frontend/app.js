@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.22.5';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.22.5';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.22.5';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.22.5';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.22.5';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.22.6';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.22.6';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.22.6';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.22.6';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.22.6';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -249,7 +249,7 @@ function renderDnsAccess() {
   const firewallWarning = dnsAccess.firewall?.enabled && !dnsAccess.firewall.applied
     ? `Firewall rules were not applied: ${dnsAccess.firewall.detail || "helper failed"}.`
     : "";
-  $("#dnsAccessHelp").textContent = dnsAccessMessage || firewallWarning || `${dnsAccess.serverIp || "DNS server"} access list for ${dnsAccess.lanSubnet || "configured LAN"}.`;
+  $("#dnsAccessHelp").textContent = dnsAccessMessage || firewallWarning || "DNS approvals sync automatically. Temporary access expires in the background.";
   $("#dnsAccessHelp").className = `config-help ${dnsAccessMessage ? dnsAccessMessageState : firewallWarning ? "bad" : dnsAccessMessageState}`;
 
   const orderedClients = [...clients].sort((left, right) => {
@@ -260,9 +260,9 @@ function renderDnsAccess() {
 
   $("#dnsClientList").innerHTML = orderedClients.map((client) => {
     const status = client.effectiveStatus || client.status || "pending";
-    const clientLabel = client.hostname || client.clientIp;
+    const clientLabel = client.displayName || client.hostname || "Unnamed device";
     const meta = [
-      client.hostname ? client.clientIp : "",
+      client.clientIp || "",
       client.macAddress || "",
       client.approvedUntil ? `expires ${formatFuture(client.approvedUntil)}` : "",
       client.lastSeenAt ? `last seen ${formatUpdated(client.lastSeenAt)}` : ""
@@ -279,7 +279,10 @@ function renderDnsAccess() {
     return `
       <article class="config-card dns-client-card">
         <div>
-          <strong>${escapeHtml(clientLabel)}</strong>
+          <div class="dns-client-title-row">
+            <strong>${escapeHtml(clientLabel)}</strong>
+            <button class="text-button compact" type="button" data-dns-label="${escapeAttr(client.clientIp)}">${escapeHtml(client.displayName ? "Rename" : "Name")}</button>
+          </div>
           <p>${escapeHtml(meta || "No recent DNS attempts recorded")}</p>
         </div>
         <div class="dns-client-actions">
@@ -292,6 +295,9 @@ function renderDnsAccess() {
 
   $$("#dnsClientList [data-dns-action]").forEach((button) => {
     button.addEventListener("click", () => runDnsClientAction(button.dataset.clientIp, button.dataset.dnsAction));
+  });
+  $$("#dnsClientList [data-dns-label]").forEach((button) => {
+    button.addEventListener("click", () => renameDnsClient(button.dataset.dnsLabel));
   });
 }
 
@@ -707,6 +713,25 @@ function runDnsClientAction(clientIp, actionName) {
     danger: action.kind !== "dns-approve"
   };
   openAuthSheet();
+}
+
+async function renameDnsClient(clientIp) {
+  const client = (dnsAccess.clients || []).find((item) => item.clientIp === clientIp);
+  const currentName = client?.displayName || "";
+  const nextName = window.prompt("Device name", currentName);
+  if (nextName === null) return;
+  try {
+    await api.updateDnsClientLabel(clientIp, nextName.trim());
+    dnsAccessMessage = nextName.trim() ? `${nextName.trim()} saved.` : "Device name cleared.";
+    dnsAccessMessageState = "good";
+    addAudit("Renamed DNS client", "dns-access", "success", clientIp);
+    await refreshDnsAccess();
+  } catch (error) {
+    dnsAccessMessage = error.message;
+    dnsAccessMessageState = "bad";
+    addAudit("Rename DNS client failed", "dns-access", "failure", error.message);
+    renderDnsAccess();
+  }
 }
 
 function renderAuthError(message) {

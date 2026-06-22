@@ -60,3 +60,7 @@ class DeviceTokenRotateRequest(BaseModel):
 
 class DnsClientApproveRequest(ActionRequest):
     duration: str = "2h"
+
+
+class DnsClientLabelRequest(BaseModel):
+    displayName: str | None = None
