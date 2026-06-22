@@ -1051,6 +1051,22 @@ button {
     flex: 1;
     min-height: 42px;
   }
+
+  .dns-client-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .dns-client-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .dns-client-actions .text-button {
+    min-width: 76px;
+    min-height: 42px;
+  }
 }
 
 .inline-muted {
