@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.22.4';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.22.4';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.22.4';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.22.4';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.22.4';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.22.5';
+import { createNoDataState } from './js/empty-state.js?v=2026.06.22.5';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.22.5';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.22.5';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.22.5';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -246,8 +246,11 @@ function renderDnsAccess() {
   const stateLabel = dnsAccess.enabled ? `${approvedCount} approved` : "Disabled";
   $("#dnsAccessState").textContent = pendingCount ? `${pendingCount} pending` : stateLabel;
   $("#dnsAccessState").className = `pill ${pendingCount ? "warn" : dnsAccess.enabled ? "good" : "muted"}`;
-  $("#dnsAccessHelp").textContent = dnsAccessMessage || `${dnsAccess.serverIp || "DNS server"} access list for ${dnsAccess.lanSubnet || "configured LAN"}.`;
-  $("#dnsAccessHelp").className = `config-help ${dnsAccessMessageState}`;
+  const firewallWarning = dnsAccess.firewall?.enabled && !dnsAccess.firewall.applied
+    ? `Firewall rules were not applied: ${dnsAccess.firewall.detail || "helper failed"}.`
+    : "";
+  $("#dnsAccessHelp").textContent = dnsAccessMessage || firewallWarning || `${dnsAccess.serverIp || "DNS server"} access list for ${dnsAccess.lanSubnet || "configured LAN"}.`;
+  $("#dnsAccessHelp").className = `config-help ${dnsAccessMessage ? dnsAccessMessageState : firewallWarning ? "bad" : dnsAccessMessageState}`;
 
   const orderedClients = [...clients].sort((left, right) => {
     const rank = { pending: 0, expired: 1, approved: 2, denied: 3 };

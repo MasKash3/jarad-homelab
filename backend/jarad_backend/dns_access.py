@@ -189,6 +189,12 @@ def revoke_client(client_ip: str) -> tuple[dict[str, Any], dict[str, Any]]:
 def list_clients() -> dict[str, Any]:
     expire_clients()
     detected = collect_detected_clients()
+    firewall = apply_firewall_rules() if DNS_ACCESS_ENABLED else {
+        "enabled": False,
+        "applied": False,
+        "allowedIps": approved_client_ips(),
+        "detail": "DNS access enforcement is disabled",
+    }
     now = utc_now()
     with connect() as db:
         rows = db.execute("SELECT * FROM dns_clients ORDER BY last_seen_at DESC").fetchall()
@@ -199,6 +205,7 @@ def list_clients() -> dict[str, Any]:
         "serverIp": DNS_ACCESS_SERVER_IP,
         "helper": DNS_ACCESS_HELPER,
         "detected": detected,
+        "firewall": firewall,
         "clients": clients,
         "summary": {
             "pending": sum(1 for client in clients if client["effectiveStatus"] == "pending"),
