@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import warnings
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 def ensure_private_env_file(env_path: Path) -> None:
@@ -80,15 +82,60 @@ DNS_ACCESS_LAN_SUBNET = env("JARAD_DNS_LAN_SUBNET", "10.0.0.0/24", "HOMELAB_DNS_
 DNS_ACCESS_SERVER_IP = env("JARAD_DNS_SERVER_IP", LAN_IP, "HOMELAB_DNS_SERVER_IP")
 DNS_ACCESS_HELPER = env("JARAD_DNS_ACCESS_HELPER", "/usr/local/sbin/jarad-dns-access", "HOMELAB_DNS_ACCESS_HELPER")
 
-ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in env(
-        "JARAD_ALLOWED_ORIGINS",
-        "http://127.0.0.1:5178,http://localhost:5178,http://10.0.0.10:5178,https://jarad.example.ts.net:8444",
-        "HOMELAB_ALLOWED_ORIGINS",
-    ).split(",")
-    if origin.strip()
-]
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def exact_origin(value: str, setting_name: str) -> str:
+    raw_value = value.strip()
+    parsed = urlsplit(raw_value)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+        or "*" in raw_value
+    ):
+        raise RuntimeError(f"{setting_name} must contain exact HTTP(S) origins without paths, credentials, or wildcards.")
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+EXPECTED_HTTPS_ORIGIN = exact_origin(WEBAUTHN_ORIGIN, "JARAD_WEBAUTHN_ORIGIN")
+if not EXPECTED_HTTPS_ORIGIN.startswith("https://"):
+    raise RuntimeError("JARAD_WEBAUTHN_ORIGIN must use HTTPS.")
+
+
+def allowed_origins() -> list[str]:
+    configured = env("JARAD_ALLOWED_ORIGINS", EXPECTED_HTTPS_ORIGIN, "HOMELAB_ALLOWED_ORIGINS")
+    origins: list[str] = []
+    for value in configured.split(","):
+        if not value.strip():
+            continue
+        origin = exact_origin(value, "JARAD_ALLOWED_ORIGINS")
+        parsed = urlsplit(origin)
+        is_loopback_development = parsed.scheme == "http" and parsed.hostname in LOOPBACK_HOSTS
+        if parsed.scheme == "http" and not is_loopback_development:
+            warnings.warn(
+                f"Ignoring insecure non-loopback CORS origin: {origin}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            continue
+        if origin != EXPECTED_HTTPS_ORIGIN and not is_loopback_development:
+            raise RuntimeError(
+                "JARAD_ALLOWED_ORIGINS may contain only the exact JARAD_WEBAUTHN_ORIGIN "
+                "and explicit HTTP loopback origins for local development."
+            )
+        if origin not in origins:
+            origins.append(origin)
+    if EXPECTED_HTTPS_ORIGIN not in origins:
+        raise RuntimeError("JARAD_ALLOWED_ORIGINS must include the exact JARAD_WEBAUTHN_ORIGIN.")
+    return origins
+
+
+ALLOWED_ORIGINS = allowed_origins()
 
 
 def service_url(subdomain: str, legacy_port: int | None = None, path: str = "") -> str:
