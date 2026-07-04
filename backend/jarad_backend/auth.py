@@ -10,15 +10,16 @@ import time
 from collections import deque
 from typing import Deque
 
-from fastapi import Header, HTTPException, Request
+from fastapi import Cookie, Header, HTTPException, Request
 
-from .config import APP_TOKEN, TOTP_SECRET
+from .config import ALLOWED_ORIGINS, APP_TOKEN, TOTP_SECRET
 from .models import ActionRequest
 from .webauthn_auth import consume_action_token
 from .webauthn_store import WebAuthnStore
 
 
 store = WebAuthnStore()
+DEVICE_COOKIE_NAME = "jarad_device"
 BOOTSTRAP_ALLOWED_PATHS = {"/api/auth/devices/register"}
 TOTP_STEP_SECONDS = 30
 TOTP_FAILURE_WINDOW_SECONDS = 300
@@ -74,8 +75,17 @@ def require_token(request: Request, authorization: str | None = Header(default=N
     raise HTTPException(status_code=401, detail="Invalid or missing bearer token")
 
 
-def require_device_token(request: Request, authorization: str | None = Header(default=None)) -> dict:
+def require_device_token(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    device_cookie: str | None = Cookie(default=None, alias=DEVICE_COOKIE_NAME),
+) -> dict:
     token = bearer_token(authorization)
+    token_source = "header"
+    if not token and device_cookie:
+        require_allowed_cookie_origin(request)
+        token = device_cookie
+        token_source = "cookie"
     if not token:
         raise HTTPException(status_code=401, detail="Invalid or missing bearer token")
 
@@ -85,9 +95,16 @@ def require_device_token(request: Request, authorization: str | None = Header(de
         request.state.auth_token_kind = "device"
         request.state.auth_device_id = device["device_id"]
         request.state.auth_device_label = device["device_label"]
+        request.state.auth_device_token_source = token_source
         return device
 
     raise HTTPException(status_code=401, detail="Use a registered device token for this request")
+
+
+def require_allowed_cookie_origin(request: Request) -> None:
+    origin = request.headers.get("origin")
+    if not origin or origin not in ALLOWED_ORIGINS:
+        raise HTTPException(status_code=403, detail="Device cookie requires an allowed same-origin request")
 
 
 def bearer_token(authorization: str | None) -> str | None:

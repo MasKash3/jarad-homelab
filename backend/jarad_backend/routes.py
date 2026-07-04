@@ -6,11 +6,11 @@ import socket
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from .audit import audit_event
-from .auth import require_device_token, require_token, verify_action_auth, verify_totp_for_actor
-from .config import ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP, LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
+from .auth import DEVICE_COOKIE_NAME, require_device_token, require_token, verify_action_auth, verify_totp_for_actor
+from .config import ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP, DEVICE_TOKEN_TTL_DAYS, LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
 from .device_tokens import create_browser_session, create_device_token, list_device_tokens, revoke_device_token, rotate_device_token
 from .dns_access import approve_client, deny_client, list_clients as list_dns_clients, revoke_client, update_client_label
 from .docker import docker_action, docker_logs
@@ -101,10 +101,29 @@ def auth_devices(request: Request) -> dict[str, Any]:
     }
 
 
+def set_device_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=DEVICE_COOKIE_NAME,
+        value=token,
+        max_age=DEVICE_TOKEN_TTL_DAYS * 24 * 60 * 60,
+        path="/api/auth",
+        secure=True,
+        httponly=True,
+        samesite="strict",
+    )
+
+
 @router.post("/api/auth/session")
-def auth_session_create(request: Request, device: dict[str, Any] = Depends(require_device_token)) -> dict[str, Any]:
+def auth_session_create(
+    request: Request,
+    response: Response,
+    device: dict[str, Any] = Depends(require_device_token),
+) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="browser-session-create", limit=20, window_seconds=300)
     result = create_browser_session(device["device_id"], request)
+    header_token = request.headers.get("authorization", "").partition(" ")[2]
+    if header_token and getattr(request.state, "auth_device_token_source", None) == "header":
+        set_device_cookie(response, header_token)
     audit_event(
         "browser_session.created",
         "success",
@@ -119,7 +138,7 @@ def auth_session_create(request: Request, device: dict[str, Any] = Depends(requi
 
 
 @router.post("/api/auth/devices/register", dependencies=protected)
-def auth_device_register(payload: DeviceTokenRegisterRequest, request: Request) -> dict[str, Any]:
+def auth_device_register(payload: DeviceTokenRegisterRequest, request: Request, response: Response) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="device-token-register", limit=6, window_seconds=300)
     if not verify_totp_for_actor(payload.totpCode, request, consume=True):
         audit_event(
@@ -130,13 +149,14 @@ def auth_device_register(payload: DeviceTokenRegisterRequest, request: Request) 
         )
         raise HTTPException(status_code=401, detail="Invalid TOTP code")
     result = create_device_token(payload.deviceLabel, request)
+    set_device_cookie(response, result["token"])
     audit_event(
         "device_token.registration",
         "success",
         request=request,
         details={"device_id": result["device"]["deviceId"], "device_label": result["device"]["deviceLabel"]},
     )
-    return result
+    return {"device": result["device"]}
 
 
 @router.delete("/api/auth/devices/{device_id}", dependencies=protected)
@@ -162,18 +182,15 @@ def auth_device_revoke(device_id: str, payload: DeviceTokenRevokeRequest, reques
     return {"status": "revoked"}
 
 
-@router.post("/api/auth/devices/current/rotate", dependencies=protected)
-def auth_device_rotate(payload: DeviceTokenRotateRequest, request: Request) -> dict[str, Any]:
+@router.post("/api/auth/devices/current/rotate")
+def auth_device_rotate(
+    payload: DeviceTokenRotateRequest,
+    request: Request,
+    response: Response,
+    device: dict[str, Any] = Depends(require_device_token),
+) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="device-token-rotate", limit=5, window_seconds=300)
-    device_id = getattr(request.state, "auth_device_id", None)
-    if not device_id or getattr(request.state, "auth_token_kind", None) != "device":
-        audit_event(
-            "device_token.rotation",
-            "failure",
-            request=request,
-            details={"detail": "Device token is required for rotation"},
-        )
-        raise HTTPException(status_code=403, detail="Use a registered device token before rotating it")
+    device_id = device["device_id"]
     if not verify_totp_for_actor(payload.totpCode, request, consume=True):
         audit_event(
             "device_token.rotation",
@@ -191,6 +208,7 @@ def auth_device_rotate(payload: DeviceTokenRotateRequest, request: Request) -> d
             details={"device_id": device_id, "detail": "Unknown or expired device token"},
         )
         raise HTTPException(status_code=404, detail="Unknown or expired device token")
+    set_device_cookie(response, result["token"])
     audit_event(
         "device_token.rotation",
         "success",
@@ -202,7 +220,7 @@ def auth_device_rotate(payload: DeviceTokenRotateRequest, request: Request) -> d
             "expires_at": result["device"]["expiresAt"],
         },
     )
-    return result
+    return {"device": result["device"]}
 
 
 @router.post("/api/auth/webauthn/register/options", dependencies=protected)

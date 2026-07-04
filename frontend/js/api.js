@@ -74,10 +74,11 @@ function hasUsableBrowserSession(session) {
 }
 
 async function createBrowserSession(currentSettings) {
-  if (!currentSettings.token || !currentSettings.baseUrl) return null;
+  if (!currentSettings.baseUrl) return null;
   const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}/api/auth/session`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${currentSettings.token}` }
+    credentials: "include",
+    headers: currentSettings.token ? { Authorization: `Bearer ${currentSettings.token}` } : {}
   });
   if (!response.ok) return null;
   const payload = await response.json();
@@ -89,12 +90,15 @@ async function createBrowserSession(currentSettings) {
     deviceId: payload.session.deviceId
   };
   writeBrowserSession(session);
+  if (currentSettings.token) {
+    window.dispatchEvent(new CustomEvent("jarad-device-token-migrated"));
+  }
   return session;
 }
 
 async function authTokenFor(currentSettings, authMode = "session") {
-  if (!currentSettings.token) return "";
   if (authMode === "device") return currentSettings.token;
+  if (authMode === "cookie") return "";
 
   const existingSession = readBrowserSession();
   if (hasUsableBrowserSession(existingSession)) return existingSession.token;
@@ -128,6 +132,7 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
 
     const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}${path}`, {
       ...fetchOptions,
+      credentials: "include",
       headers: {
         ...(fetchOptions.body ? { "Content-Type": "application/json" } : {}),
         ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
@@ -209,7 +214,7 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
     const result = await request("/api/auth/devices/current/rotate", {
       method: "POST",
       body: JSON.stringify({ totpCode }),
-      authMode: "device"
+      authMode: "cookie"
     });
     clearBrowserSession();
     return result;

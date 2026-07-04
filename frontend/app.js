@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.06.22.7';
-import { createNoDataState } from './js/empty-state.js?v=2026.06.22.7';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.06.22.7';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.06.22.7';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.06.22.7';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.04.1';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.04.1';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.04.1';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.04.1';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.04.1';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -26,6 +26,7 @@ let connectionState = {
   mode: "disconnected",
   label: "No backend"
 };
+const DEVICE_RENEWAL_WARNING_DAYS = 14;
 
 const api = createApi({
   addAudit,
@@ -59,6 +60,19 @@ function writeSettings(settings) {
     clearBrowserSession();
   }
   localStorage.setItem(storageKeys.settings, JSON.stringify(settings));
+}
+
+function clearStoredDeviceToken(expectedToken = null) {
+  [storageKeys.settings, legacyStorageKeys.settings].forEach((key) => {
+    try {
+      const settings = JSON.parse(localStorage.getItem(key)) || {};
+      if (!settings.token || (expectedToken && settings.token !== expectedToken)) return;
+      localStorage.setItem(key, JSON.stringify({ ...settings, token: "" }));
+    } catch {
+      // Ignore malformed legacy settings; they are not used for authentication.
+    }
+  });
+  renderSettings();
 }
 
 function renderSettingsError(message = "") {
@@ -329,6 +343,10 @@ function renderConfig() {
     </article>
   `).join("") || emptyState("No passkeys registered on this backend yet.");
   $("#deviceTokenList").innerHTML = deviceTokens.map((device) => {
+    const expiresAtMs = Date.parse(device.expiresAt || "");
+    const renewalWarning = device.isCurrent
+      && Number.isFinite(expiresAtMs)
+      && expiresAtMs <= Date.now() + DEVICE_RENEWAL_WARNING_DAYS * 24 * 60 * 60 * 1000;
     const deviceStatus = device.revokedAt
       ? `Revoked ${formatUpdated(device.revokedAt)}`
       : `${device.lastUsedAt ? `Last used ${formatUpdated(device.lastUsedAt)}` : `Created ${formatUpdated(device.createdAt)}`}${device.expiresAt ? `; expires ${formatFuture(device.expiresAt)}` : ""}`;
@@ -340,6 +358,7 @@ function renderConfig() {
       </div>
       ${device.revokedAt ? `<span class="pill warn">Revoked</span>` : `
         <div class="device-token-actions">
+          ${renewalWarning ? `<span class="pill warn">Renew soon</span>` : ""}
           ${device.isCurrent ? `<button class="text-button" type="button" data-rotate-device>Rotate</button>` : ""}
           <button class="text-button" type="button" data-revoke-device="${escapeAttr(device.deviceId)}">Revoke</button>
         </div>
@@ -827,6 +846,13 @@ async function refreshDeviceTokens() {
         ...device,
         isCurrent: device.deviceId === payload.currentDeviceId
       }));
+    const currentDevice = deviceTokens.find((device) => device.isCurrent);
+    const expiresAtMs = Date.parse(currentDevice?.expiresAt || "");
+    if (currentDevice && Number.isFinite(expiresAtMs)
+        && expiresAtMs <= Date.now() + DEVICE_RENEWAL_WARNING_DAYS * 24 * 60 * 60 * 1000) {
+      deviceTokenMessage = `This device access expires ${formatFuture(currentDevice.expiresAt)}. Rotate it now to renew access.`;
+      deviceTokenMessageState = "warn";
+    }
   } catch {
     deviceTokens = [];
   }
@@ -848,10 +874,7 @@ async function registerThisDeviceToken() {
       throw new Error("TOTP is required to register this device.");
     }
     const result = await api.registerDeviceToken(defaultDeviceLabel().replace(/ passkey$/i, ""), totpCode);
-    writeSettings({
-      ...settings,
-      token: result.token
-    });
+    clearStoredDeviceToken(settings.token);
     deviceTokenMessage = "This browser is registered with a revocable device token.";
     deviceTokenMessageState = "good";
     addAudit("Registered device token", "config", "success", result.device?.deviceLabel || "This device");
@@ -877,10 +900,7 @@ async function rotateCurrentDeviceToken() {
       throw new Error("TOTP is required to rotate this device token.");
     }
     const result = await api.rotateDeviceToken(totpCode);
-    writeSettings({
-      ...settings,
-      token: result.token
-    });
+    clearStoredDeviceToken(settings.token);
     deviceTokenMessage = "This browser's device token was rotated.";
     deviceTokenMessageState = "good";
     addAudit("Rotated device token", "config", "success", result.device?.deviceLabel || "This device");
@@ -1072,6 +1092,9 @@ function bindEvents() {
     refreshState();
   });
   $("#apiBaseInput").addEventListener("input", () => renderSettingsError(""));
+  window.addEventListener("jarad-device-token-migrated", () => {
+    clearStoredDeviceToken();
+  });
 }
 
 if ("serviceWorker" in navigator) {
