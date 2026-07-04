@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.04.1';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.04.1';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.04.1';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.04.1';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.04.1';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.04.2';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.04.2';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.04.2';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.04.2';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.04.2';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -137,6 +137,7 @@ function renderDashboard() {
   const healthScore = percentValue(state.server.healthScore);
   $("#healthScore").textContent = state.server.healthScore;
   $(".score-ring").className = `score-ring ${healthScore >= 80 ? "good" : healthScore >= 60 ? "warn" : "bad"}`;
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#metricGrid").innerHTML = state.metrics.map((metric) => `
     <article class="metric">
       <div class="metric-top">
@@ -161,6 +162,7 @@ function renderDashboard() {
   $("#fullBackup").textContent = state.backups.full;
   $("#nextBackup").textContent = state.backups.next;
 
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#launcherGrid").innerHTML = state.services.map((service) => `
     <a class="launcher ${escapeAttr(serviceColorClass(service.id))}" href="${escapeAttr(safeUrl(service.url))}" target="_blank" rel="noreferrer">
       <b>${escapeHtml(service.icon)}</b>
@@ -178,6 +180,7 @@ function renderServices() {
     return true;
   });
 
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#serviceList").innerHTML = services.map((service) => `
     <button class="service-card" type="button" data-service-id="${escapeAttr(service.id)}">
       <span class="service-icon ${escapeAttr(serviceColorClass(service.id))}">${escapeHtml(service.icon)}</span>
@@ -208,6 +211,7 @@ function renderLogs() {
     return matchesFilter && matchesSearch;
   });
 
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#logList").innerHTML = logs.map((log) => `
     <article class="log-entry ${log.level === "error" ? "error" : ""}">
       <header>
@@ -235,6 +239,7 @@ function renderAlerts() {
   const hasWarning = state.alerts.some((alert) => alert.time === "Active" && alert.state === "warn");
   $("#activeAlertCount").textContent = `${active} active`;
   $("#activeAlertCount").className = `pill ${hasCritical ? "bad" : hasWarning ? "warn" : "good"}`;
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#alertList").innerHTML = state.alerts.map((alert) => `
     <article class="alert-card ${escapeAttr(alert.state)}">
       <header>
@@ -244,6 +249,7 @@ function renderAlerts() {
       <p>${escapeHtml(alert.body)}</p>
     </article>
   `).join("");
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#networkGrid").innerHTML = state.network.map(([label, value]) => `
     <div>
       <span>${escapeHtml(label)}</span>
@@ -272,6 +278,7 @@ function renderDnsAccess() {
       || String(right.lastSeenAt || "").localeCompare(String(left.lastSeenAt || ""));
   });
 
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#dnsClientList").innerHTML = orderedClients.map((client) => {
     const status = client.effectiveStatus || client.status || "pending";
     const clientLabel = client.displayName || client.hostname || "Unnamed device";
@@ -333,6 +340,7 @@ function renderConfig() {
     ? "Passkey is active for protected actions. TOTP remains available as a fallback."
     : "TOTP is active for protected actions.";
   $("#backendState").textContent = settings.baseUrl || hasAutoBackend() ? "Configured" : "Not connected";
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#passkeyList").innerHTML = passkeyCredentials.map((credential) => `
     <article class="config-card">
       <div>
@@ -342,6 +350,7 @@ function renderConfig() {
       <button class="text-button" type="button" data-delete-passkey="${escapeAttr(credential.credentialId)}">Remove</button>
     </article>
   `).join("") || emptyState("No passkeys registered on this backend yet.");
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#deviceTokenList").innerHTML = deviceTokens.map((device) => {
     const expiresAtMs = Date.parse(device.expiresAt || "");
     const renewalWarning = device.isCurrent
@@ -369,6 +378,7 @@ function renderConfig() {
   $("#deviceTokenHelp").textContent = deviceTokenMessage;
   $("#deviceTokenHelp").hidden = !deviceTokenMessage;
   $("#deviceTokenHelp").className = `config-help ${deviceTokenMessageState}`;
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#configList").innerHTML = configActions.map((item) => `
     <article class="config-card">
       <div>
@@ -396,6 +406,7 @@ function renderConfig() {
 
 function renderAudit() {
   const audit = readAudit();
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#auditList").innerHTML = audit.slice(0, 12).map((item) => `
     <article class="audit-item">
       <header>
@@ -432,6 +443,7 @@ function openService(serviceId, options = {}) {
   }
   $("#sheetServiceName").textContent = service.name;
   $("#sheetServiceType").textContent = service.container;
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#serviceDetailBody").innerHTML = `
     <div class="service-detail-hero">
       <span class="service-icon large ${escapeAttr(serviceColorClass(service.id))}">${escapeHtml(service.icon)}</span>
@@ -540,6 +552,7 @@ async function loadServiceDiagnostics(service, button, auth = {}) {
     const checks = payload.checks || [];
     service.diagnostics = checks.map((check) => [check.label, check.detail, check.state]);
     const list = $("#serviceDetailBody .diagnostic-list");
+    // xss-reviewed: dynamic template values use escaping or whitelist helpers.
     list.innerHTML = service.diagnostics.map(([label, value, diagnosticStatus]) => `
       <div class="diagnostic-step">
         <span>${escapeHtml(label)}</span>
