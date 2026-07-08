@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 
 from .command import run_command
-from .config import SERVICES
+from .config import DOCKER_HELPER, SERVICES
 
 
 ALLOWED_DOCKER_ACTIONS = {"start", "restart", "stop"}
@@ -15,6 +15,11 @@ def allowed_containers() -> set[str]:
 
 def is_allowed_container(container: str) -> bool:
     return container in allowed_containers()
+
+
+def is_allowed_action(service_id: str, action: str) -> bool:
+    service = SERVICES.get(service_id)
+    return bool(service and action in service.get("allowed_actions", ()))
 
 
 def docker_command(args: list[str], *, timeout: int) -> subprocess.CompletedProcess[str] | None:
@@ -31,6 +36,7 @@ def docker_command(args: list[str], *, timeout: int) -> subprocess.CompletedProc
             or args[1] != "--timestamps"
             or args[2] != "--tail"
             or not args[3].isdigit()
+            or not 1 <= int(args[3]) <= 500
             or not is_allowed_container(args[4])
         ):
             return None
@@ -51,7 +57,7 @@ def docker_command(args: list[str], *, timeout: int) -> subprocess.CompletedProc
     else:
         return None
 
-    return run_command(["docker", *args], timeout=timeout)
+    return run_command(["sudo", "--non-interactive", DOCKER_HELPER, *args], timeout=timeout)
 
 
 def docker_ps() -> dict[str, dict[str, str]] | None:
@@ -134,5 +140,8 @@ def docker_logs(container: str, limit: int) -> tuple[int, str] | None:
     return result.returncode, combined
 
 
-def docker_action(action: str, container: str) -> subprocess.CompletedProcess[str] | None:
-    return docker_command([action, container], timeout=20)
+def docker_action(action: str, service_id: str) -> subprocess.CompletedProcess[str] | None:
+    service = SERVICES.get(service_id)
+    if not service or not is_allowed_action(service_id, action):
+        return None
+    return docker_command([action, str(service["container"])], timeout=20)

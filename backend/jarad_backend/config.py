@@ -81,6 +81,7 @@ DNS_ACCESS_ENABLED = env("JARAD_DNS_ACCESS_ENABLED", "0", "HOMELAB_DNS_ACCESS_EN
 DNS_ACCESS_LAN_SUBNET = env("JARAD_DNS_LAN_SUBNET", "10.0.0.0/24", "HOMELAB_DNS_LAN_SUBNET")
 DNS_ACCESS_SERVER_IP = env("JARAD_DNS_SERVER_IP", LAN_IP, "HOMELAB_DNS_SERVER_IP")
 DNS_ACCESS_HELPER = env("JARAD_DNS_ACCESS_HELPER", "/usr/local/sbin/jarad-dns-access", "HOMELAB_DNS_ACCESS_HELPER")
+DOCKER_HELPER = env("JARAD_DOCKER_HELPER", "/usr/local/sbin/jarad-docker", "HOMELAB_DOCKER_HELPER")
 
 LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
@@ -145,7 +146,7 @@ def service_url(subdomain: str, legacy_port: int | None = None, path: str = "") 
     return f"https://{PUBLIC_HOST}{port}{path}"
 
 
-SERVICES: dict[str, dict[str, str]] = {
+SERVICES: dict[str, dict[str, object]] = {
     "nextcloud": {
         "name": "Nextcloud",
         "type": "Files",
@@ -154,6 +155,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "image": "nextcloud:apache",
         "url": service_url("nextcloud"),
         "color": "#2563a6",
+        "allowed_actions": ("start", "restart", "stop"),
     },
     "immich": {
         "name": "Immich",
@@ -163,6 +165,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "image": "ghcr.io/immich-app/immich-server:release",
         "url": service_url("immich", 2283),
         "color": "#0f766e",
+        "allowed_actions": ("start", "restart", "stop"),
     },
     "jellyfin": {
         "name": "Jellyfin",
@@ -172,6 +175,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "image": "jellyfin/jellyfin:latest",
         "url": service_url("jellyfin", 8096),
         "color": "#7c3aed",
+        "allowed_actions": ("start", "restart", "stop"),
     },
     "portainer": {
         "name": "Portainer",
@@ -181,6 +185,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "image": "portainer/portainer-ce:latest",
         "url": service_url("portainer", 9000),
         "color": "#0ea5e9",
+        "allowed_actions": ("start", "restart", "stop"),
     },
     "pihole": {
         "name": "Pi-hole",
@@ -190,6 +195,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "image": "pihole/pihole:latest",
         "url": service_url("pihole", 8053, "/admin"),
         "color": "#dc2626",
+        "allowed_actions": ("start", "restart", "stop"),
     },
     "dozzle": {
         "name": "Dozzle",
@@ -199,6 +205,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "image": "amir20/dozzle:latest",
         "url": service_url("dozzle", 8082),
         "color": "#334155",
+        "allowed_actions": ("start", "restart", "stop"),
     },
     "uptime-kuma": {
         "name": "Uptime Kuma",
@@ -208,6 +215,7 @@ SERVICES: dict[str, dict[str, str]] = {
         "image": "louislam/uptime-kuma:latest",
         "url": service_url("uptime", 3001),
         "color": "#16a34a",
+        "allowed_actions": ("start", "restart", "stop"),
     },
     "stirling-pdf": {
         "name": "Stirling PDF",
@@ -217,5 +225,6 @@ SERVICES: dict[str, dict[str, str]] = {
         "image": "frooodle/s-pdf:latest",
         "url": service_url("stirling", 8081),
         "color": "#ca8a04",
+        "allowed_actions": ("start", "restart", "stop"),
     },
 }

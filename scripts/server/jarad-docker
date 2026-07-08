@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly DOCKER_BIN="/usr/bin/docker"
+readonly -a ALLOWED_CONTAINERS=(
+  "dozzle"
+  "immich_server"
+  "jellyfin"
+  "nextcloud-app-1"
+  "pihole"
+  "portainer"
+  "stirling-pdf"
+  "uptime-kuma"
+)
+
+deny() {
+  echo "Docker request denied by Jarad policy." >&2
+  exit 64
+}
+
+is_allowed_container() {
+  local requested="${1:-}"
+  local allowed
+  for allowed in "${ALLOWED_CONTAINERS[@]}"; do
+    if [[ "$requested" == "$allowed" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+[[ -x "$DOCKER_BIN" ]] || {
+  echo "Docker CLI is unavailable." >&2
+  exit 69
+}
+
+command_name="${1:-}"
+case "$command_name" in
+  start|restart|stop)
+    [[ "$#" -eq 2 ]] || deny
+    is_allowed_container "$2" || deny
+    exec "$DOCKER_BIN" "$command_name" "$2"
+    ;;
+  logs)
+    [[ "$#" -eq 5 && "$2" == "--timestamps" && "$3" == "--tail" ]] || deny
+    [[ "$4" =~ ^[0-9]+$ && "$4" -ge 1 && "$4" -le 500 ]] || deny
+    is_allowed_container "$5" || deny
+    exec "$DOCKER_BIN" logs --timestamps --tail "$4" "$5"
+    ;;
+  inspect)
+    [[ "$#" -eq 4 && "$2" == "-f" ]] || deny
+    [[ "$3" == "{{.RestartCount}}" || "$3" == "{{.State.StartedAt}}" ]] || deny
+    is_allowed_container "$4" || deny
+    exec "$DOCKER_BIN" inspect -f "$3" "$4"
+    ;;
+  ps)
+    [[ "$#" -eq 4 && "$2" == "-a" && "$3" == "--format" && "$4" == $'{{.Names}}\t{{.Status}}\t{{.Image}}' ]] || deny
+    filters=()
+    for container in "${ALLOWED_CONTAINERS[@]}"; do
+      filters+=(--filter "name=^/${container}$")
+    done
+    exec "$DOCKER_BIN" ps -a "${filters[@]}" --format "$4"
+    ;;
+  stats)
+    [[ "$#" -eq 4 && "$2" == "--no-stream" && "$3" == "--format" && "$4" == $'{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' ]] || deny
+    exec "$DOCKER_BIN" stats --no-stream --format "$4" "${ALLOWED_CONTAINERS[@]}"
+    ;;
+  *)
+    deny
+    ;;
+esac

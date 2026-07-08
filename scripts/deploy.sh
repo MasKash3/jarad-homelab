@@ -220,6 +220,7 @@ build_deploy_manifest() {
     append_manifest_file "$server_scripts_path/install-systemd.sh" "scripts/server/install-systemd.sh"
     append_manifest_file "$server_scripts_path/install-caddy-route.sh" "scripts/server/install-caddy-route.sh"
     append_manifest_file "$server_scripts_path/jarad-dns-access" "scripts/server/jarad-dns-access"
+    append_manifest_file "$server_scripts_path/jarad-docker" "scripts/server/jarad-docker"
     append_manifest_file "$systemd_path/jarad-backend.service" "deploy/systemd/jarad-backend.service"
     append_manifest_file "$systemd_path/jarad-frontend.service" "deploy/systemd/jarad-frontend.service"
     append_manifest_file "$caddy_path/jarad.Caddyfile" "deploy/caddy/jarad.Caddyfile"
@@ -274,13 +275,14 @@ if [[ "$frontend_only" != true ]]; then
   run scp "$server_scripts_path/install-systemd.sh" "$remote:$remote_root/scripts/server/install-systemd.sh"
   run scp "$server_scripts_path/install-caddy-route.sh" "$remote:$remote_root/scripts/server/install-caddy-route.sh"
   run scp "$server_scripts_path/jarad-dns-access" "$remote:$remote_root/scripts/server/jarad-dns-access"
+  run scp "$server_scripts_path/jarad-docker" "$remote:$remote_root/scripts/server/jarad-docker"
   run scp \
     "$systemd_path/jarad-backend.service" \
     "$systemd_path/jarad-frontend.service" \
     "$remote:$remote_root/deploy/systemd/"
   run scp "$caddy_path/jarad.Caddyfile" "$remote:$remote_root/deploy/caddy/jarad.Caddyfile"
 
-  run ssh "$remote" "chmod +x $remote_root/scripts/server/restart-backend.sh $remote_root/scripts/server/install-systemd.sh $remote_root/scripts/server/install-caddy-route.sh $remote_root/scripts/server/jarad-dns-access"
+  run ssh "$remote" "chmod +x $remote_root/scripts/server/restart-backend.sh $remote_root/scripts/server/install-systemd.sh $remote_root/scripts/server/install-caddy-route.sh $remote_root/scripts/server/jarad-dns-access $remote_root/scripts/server/jarad-docker"
   run ssh "$remote" "if [ -f $remote_root/backend/.env ]; then chmod 600 $remote_root/backend/.env; fi"
 fi
 

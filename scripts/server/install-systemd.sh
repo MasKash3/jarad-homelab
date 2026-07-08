@@ -51,6 +51,17 @@ EOF
   sudo visudo -cf /etc/sudoers.d/jarad-dns-access >/dev/null
 fi
 
+if [ ! -f "$REMOTE_ROOT/scripts/server/jarad-docker" ]; then
+  echo "Missing Jarad Docker policy helper." >&2
+  exit 1
+fi
+sudo install -o root -g root -m 0755 "$REMOTE_ROOT/scripts/server/jarad-docker" /usr/local/sbin/jarad-docker
+sudo tee /etc/sudoers.d/jarad-docker >/dev/null <<EOF
+$SERVICE_USER ALL=(root) NOPASSWD: /usr/local/sbin/jarad-docker *
+EOF
+sudo chmod 0440 /etc/sudoers.d/jarad-docker
+sudo visudo -cf /etc/sudoers.d/jarad-docker >/dev/null
+
 sudo systemctl daemon-reload
 sudo systemctl reset-failed
 sudo systemctl enable --now jarad-backend.service

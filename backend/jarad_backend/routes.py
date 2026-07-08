@@ -13,7 +13,7 @@ from .auth import DEVICE_COOKIE_NAME, require_device_token, require_token, verif
 from .config import ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP, DEVICE_TOKEN_TTL_DAYS, LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
 from .device_tokens import create_browser_session, create_device_token, list_device_tokens, revoke_device_token, rotate_device_token
 from .dns_access import approve_client, deny_client, list_clients as list_dns_clients, revoke_client, update_client_label
-from .docker import docker_action, docker_logs
+from .docker import docker_action, docker_logs, is_allowed_action
 from .metrics import read_backup_state, read_cpu_pct, read_disk, read_raid_state, read_ram_pct, read_temp_c, read_uptime
 from .models import (
     ActionRequest,
@@ -617,8 +617,24 @@ def service_action(action_id: str, payload: ActionRequest, request: Request) -> 
     action, service_id = split_action(action_id)
     service = SERVICES.get(service_id)
     if not service:
+        audit_event(
+            "docker.policy",
+            "failure",
+            request=request,
+            action_id=action_id,
+            service_id=service_id,
+            details={"action": action, "detail": "Unknown service"},
+        )
         raise HTTPException(status_code=404, detail="Unknown service")
-    if action not in {"start", "restart", "stop"}:
+    if not is_allowed_action(service_id, action):
+        audit_event(
+            "docker.policy",
+            "failure",
+            request=request,
+            action_id=action_id,
+            service_id=service_id,
+            details={"action": action, "detail": "Action denied by service policy"},
+        )
         raise HTTPException(status_code=400, detail="Unsupported action")
     method = (payload.authMethod or "").lower()
     try:
@@ -642,7 +658,7 @@ def service_action(action_id: str, payload: ActionRequest, request: Request) -> 
         details={"method": method or "missing"},
     )
 
-    result = docker_action(action, service["container"])
+    result = docker_action(action, service_id)
     if not result or result.returncode != 0:
         detail = result.stderr.strip() if result else "Docker command unavailable"
         audit_event(
