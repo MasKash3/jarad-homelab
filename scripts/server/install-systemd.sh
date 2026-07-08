@@ -2,20 +2,59 @@
 set -euo pipefail
 
 REMOTE_ROOT="${1:-$HOME/mobile}"
-SERVICE_USER="${2:-$(id -un)}"
+DEPLOY_USER="${2:-$(id -un)}"
+BACKEND_USER="${3:-jarad-backend}"
+FRONTEND_USER="${4:-jarad-frontend}"
 TEMPLATE_DIR="$REMOTE_ROOT/deploy/systemd"
+
+ensure_service_account() {
+  local account="$1"
+  if ! getent group "$account" >/dev/null; then
+    sudo groupadd --system "$account"
+  fi
+  if ! id "$account" >/dev/null 2>&1; then
+    sudo useradd --system --gid "$account" --no-create-home --shell /usr/sbin/nologin "$account"
+  fi
+}
 
 if [ ! -d "$TEMPLATE_DIR" ]; then
   echo "Missing systemd template directory: $TEMPLATE_DIR" >&2
   exit 1
 fi
 
+ensure_service_account "$BACKEND_USER"
+ensure_service_account "$FRONTEND_USER"
+
+sudo systemctl stop jarad-backend.service jarad-frontend.service 2>/dev/null || true
+
+sudo install -d -o "$BACKEND_USER" -g "$BACKEND_USER" -m 0700 /var/lib/jarad
+if [ -f "$REMOTE_ROOT/backend/jarad.sqlite3" ] && [ ! -f /var/lib/jarad/jarad.sqlite3 ]; then
+  sudo cp -a "$REMOTE_ROOT/backend/jarad.sqlite3" /var/lib/jarad/jarad.sqlite3
+fi
+for sidecar in -wal -shm -journal; do
+  if [ -f "$REMOTE_ROOT/backend/jarad.sqlite3$sidecar" ] && [ ! -f "/var/lib/jarad/jarad.sqlite3$sidecar" ]; then
+    sudo cp -a "$REMOTE_ROOT/backend/jarad.sqlite3$sidecar" "/var/lib/jarad/jarad.sqlite3$sidecar"
+  fi
+done
+sudo chown -R "$BACKEND_USER:$BACKEND_USER" /var/lib/jarad
+sudo chmod 0700 /var/lib/jarad
+sudo find /var/lib/jarad -maxdepth 1 -type f -name 'jarad.sqlite3*' -exec chmod 0600 {} +
+
+sudo chown -R "$DEPLOY_USER:$BACKEND_USER" "$REMOTE_ROOT/backend"
+sudo chmod -R u=rwX,g=rX,o= "$REMOTE_ROOT/backend"
+sudo chmod 2750 "$REMOTE_ROOT/backend"
+
+sudo chown -R "$DEPLOY_USER:$FRONTEND_USER" "$REMOTE_ROOT/frontend"
+sudo chmod -R u=rwX,g=rX,o= "$REMOTE_ROOT/frontend"
+sudo chmod 2750 "$REMOTE_ROOT/frontend"
+
 if [ ! -d "$REMOTE_ROOT/backend/.venv" ]; then
   python3 -m venv "$REMOTE_ROOT/backend/.venv"
 fi
 
 if [ -f "$REMOTE_ROOT/backend/.env" ]; then
-  chmod 600 "$REMOTE_ROOT/backend/.env"
+  sudo chown "$DEPLOY_USER:$BACKEND_USER" "$REMOTE_ROOT/backend/.env"
+  sudo chmod 0640 "$REMOTE_ROOT/backend/.env"
 fi
 
 # shellcheck disable=SC1091
@@ -25,6 +64,9 @@ if [ ! -f "$REMOTE_ROOT/backend/requirements.lock" ]; then
   exit 1
 fi
 pip install --require-hashes -r "$REMOTE_ROOT/backend/requirements.lock"
+sudo chown -R "$DEPLOY_USER:$BACKEND_USER" "$REMOTE_ROOT/backend"
+sudo chmod -R u=rwX,g=rX,o= "$REMOTE_ROOT/backend"
+sudo chmod 2750 "$REMOTE_ROOT/backend"
 
 for legacy_service in homelab-mobile-backend.service homelab-mobile-frontend.service; do
   if systemctl list-unit-files "$legacy_service" --no-legend 2>/dev/null | grep -q "$legacy_service"; then
@@ -33,19 +75,23 @@ for legacy_service in homelab-mobile-backend.service homelab-mobile-frontend.ser
   fi
 done
 
-for service in jarad-backend.service jarad-frontend.service; do
-  sed \
-    -e "s#__REMOTE_ROOT__#$REMOTE_ROOT#g" \
-    -e "s#__USER__#$SERVICE_USER#g" \
-    "$TEMPLATE_DIR/$service" > "/tmp/$service"
-  sudo install -m 0644 "/tmp/$service" "/etc/systemd/system/$service"
-done
+sed \
+  -e "s#__REMOTE_ROOT__#$REMOTE_ROOT#g" \
+  -e "s#__BACKEND_USER__#$BACKEND_USER#g" \
+  "$TEMPLATE_DIR/jarad-backend.service" > /tmp/jarad-backend.service
+sudo install -m 0644 /tmp/jarad-backend.service /etc/systemd/system/jarad-backend.service
+
+sed \
+  -e "s#__REMOTE_ROOT__#$REMOTE_ROOT#g" \
+  -e "s#__FRONTEND_USER__#$FRONTEND_USER#g" \
+  "$TEMPLATE_DIR/jarad-frontend.service" > /tmp/jarad-frontend.service
+sudo install -m 0644 /tmp/jarad-frontend.service /etc/systemd/system/jarad-frontend.service
 
 if [ -f "$REMOTE_ROOT/scripts/server/jarad-dns-access" ]; then
   sudo install -m 0755 "$REMOTE_ROOT/scripts/server/jarad-dns-access" /usr/local/sbin/jarad-dns-access
   sudo tee /etc/sudoers.d/jarad-dns-access >/dev/null <<EOF
-$SERVICE_USER ALL=(root) NOPASSWD: /usr/local/sbin/jarad-dns-access detect
-$SERVICE_USER ALL=(root) NOPASSWD: /usr/local/sbin/jarad-dns-access apply *
+$BACKEND_USER ALL=(root) NOPASSWD: /usr/local/sbin/jarad-dns-access detect
+$BACKEND_USER ALL=(root) NOPASSWD: /usr/local/sbin/jarad-dns-access apply *
 EOF
   sudo chmod 0440 /etc/sudoers.d/jarad-dns-access
   sudo visudo -cf /etc/sudoers.d/jarad-dns-access >/dev/null
@@ -57,13 +103,17 @@ if [ ! -f "$REMOTE_ROOT/scripts/server/jarad-docker" ]; then
 fi
 sudo install -o root -g root -m 0755 "$REMOTE_ROOT/scripts/server/jarad-docker" /usr/local/sbin/jarad-docker
 sudo tee /etc/sudoers.d/jarad-docker >/dev/null <<EOF
-$SERVICE_USER ALL=(root) NOPASSWD: /usr/local/sbin/jarad-docker *
+$BACKEND_USER ALL=(root) NOPASSWD: /usr/local/sbin/jarad-docker *
 EOF
 sudo chmod 0440 /etc/sudoers.d/jarad-docker
 sudo visudo -cf /etc/sudoers.d/jarad-docker >/dev/null
 
 sudo systemctl daemon-reload
 sudo systemctl reset-failed
+if sudo -u "$FRONTEND_USER" test -r "$REMOTE_ROOT/backend/.env"; then
+  echo "Frontend service account can read backend secrets; refusing to start services." >&2
+  exit 1
+fi
 sudo systemctl enable --now jarad-backend.service
 sudo systemctl enable --now jarad-frontend.service
 

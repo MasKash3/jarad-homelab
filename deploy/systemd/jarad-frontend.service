@@ -5,15 +5,31 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=__USER__
-Group=__USER__
-WorkingDirectory=__REMOTE_ROOT__/frontend
+User=__FRONTEND_USER__
+Group=__FRONTEND_USER__
+WorkingDirectory=/opt/jarad/app
 Environment=JARAD_FRONTEND_HOST=127.0.0.1
 Environment=JARAD_FRONTEND_PORT=5178
-EnvironmentFile=-__REMOTE_ROOT__/backend/.env
 ExecStart=/usr/bin/python3 -m http.server ${JARAD_FRONTEND_PORT} --bind ${JARAD_FRONTEND_HOST}
 Restart=on-failure
 RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+BindReadOnlyPaths=__REMOTE_ROOT__/frontend:/opt/jarad/app
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
 
 [Install]
 WantedBy=multi-user.target

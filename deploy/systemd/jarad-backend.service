@@ -5,14 +5,15 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=__USER__
-Group=__USER__
-WorkingDirectory=__REMOTE_ROOT__/backend
+User=__BACKEND_USER__
+Group=__BACKEND_USER__
+WorkingDirectory=/opt/jarad/app
+EnvironmentFile=-__REMOTE_ROOT__/backend/.env
 Environment=JARAD_BACKEND_HOST=127.0.0.1
 Environment=JARAD_BACKEND_PORT=8443
 Environment=JARAD_DOCKER_HELPER=/usr/local/sbin/jarad-docker
-EnvironmentFile=-__REMOTE_ROOT__/backend/.env
-ExecStart=__REMOTE_ROOT__/backend/.venv/bin/uvicorn jarad_backend.main:app --host ${JARAD_BACKEND_HOST} --port ${JARAD_BACKEND_PORT}
+Environment=JARAD_DB_PATH=/var/lib/jarad/jarad.sqlite3
+ExecStart=/opt/jarad/app/.venv/bin/uvicorn jarad_backend.main:app --host ${JARAD_BACKEND_HOST} --port ${JARAD_BACKEND_PORT}
 Restart=on-failure
 RestartSec=5
 UMask=0077
@@ -20,14 +21,21 @@ UMask=0077
 NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=__REMOTE_ROOT__/backend
+ProtectHome=true
+BindReadOnlyPaths=__REMOTE_ROOT__/backend:/opt/jarad/app
+StateDirectory=jarad
+StateDirectoryMode=0700
+ReadWritePaths=/var/lib/jarad
+PrivateDevices=true
+ProtectClock=true
+ProtectHostname=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
 RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 SystemCallArchitectures=native
 
 [Install]
