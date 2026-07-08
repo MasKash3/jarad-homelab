@@ -10,7 +10,11 @@ fi
 
 # shellcheck disable=SC1091
 . .venv/bin/activate
-pip install -r requirements.txt
+if [ ! -f requirements.lock ]; then
+  echo "Missing requirements.lock; refusing an unhashed dependency install." >&2
+  exit 1
+fi
+pip install --require-hashes -r requirements.lock
 
 backend_port="${JARAD_BACKEND_PORT:-${HOMELAB_BACKEND_PORT:-8443}}"
 

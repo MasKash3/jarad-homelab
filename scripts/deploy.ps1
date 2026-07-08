@@ -79,6 +79,9 @@ if (-not (Test-Path $frontendPath)) {
 if (-not (Test-Path $backendPath)) {
   throw "Missing backend directory: $backendPath"
 }
+if (-not $FrontendOnly -and -not (Test-Path (Join-Path $backendPath "requirements.lock"))) {
+  throw "Missing backend/requirements.lock; refusing an unhashed backend deployment."
+}
 if ($InstallCaddy -and [string]::IsNullOrWhiteSpace($CaddyDomain)) {
   throw "-InstallCaddy requires -CaddyDomain <device.tailnet.ts.net>."
 }
@@ -100,6 +103,7 @@ if (-not $FrontendOnly) {
     "-r",
     (Join-Path $backendPath "jarad_backend"),
     (Join-Path $backendPath "requirements.txt"),
+    (Join-Path $backendPath "requirements.lock"),
     (Join-Path $backendPath "README.md"),
     "${remote}:$RemoteRoot/backend/"
   )
@@ -148,7 +152,7 @@ if ($InstallBackendDeps) {
   Write-Host "Installing backend dependencies..." -ForegroundColor Cyan
   Invoke-Checked "ssh" @(
     $remote,
-    "cd $RemoteRoot/backend && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt"
+    "cd $RemoteRoot/backend && test -f requirements.lock && python3 -m venv .venv && . .venv/bin/activate && pip install --require-hashes -r requirements.lock"
   )
 }
 

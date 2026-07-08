@@ -20,11 +20,11 @@ fi
 
 # shellcheck disable=SC1091
 . "$REMOTE_ROOT/backend/.venv/bin/activate"
-if [ -f "$REMOTE_ROOT/backend/requirements.lock" ]; then
-  pip install --require-hashes -r "$REMOTE_ROOT/backend/requirements.lock"
-else
-  pip install -r "$REMOTE_ROOT/backend/requirements.txt"
+if [ ! -f "$REMOTE_ROOT/backend/requirements.lock" ]; then
+  echo "Missing backend/requirements.lock; refusing an unhashed dependency install." >&2
+  exit 1
 fi
+pip install --require-hashes -r "$REMOTE_ROOT/backend/requirements.lock"
 
 for legacy_service in homelab-mobile-backend.service homelab-mobile-frontend.service; do
   if systemctl list-unit-files "$legacy_service" --no-legend 2>/dev/null | grep -q "$legacy_service"; then

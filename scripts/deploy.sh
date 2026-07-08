@@ -249,6 +249,11 @@ if [[ ! -d "$backend_path" ]]; then
   exit 1
 fi
 
+if [[ "$frontend_only" != true && ! -f "$backend_path/requirements.lock" ]]; then
+  echo "Missing backend/requirements.lock; refusing an unhashed backend deployment." >&2
+  exit 1
+fi
+
 run ssh "$remote" "mkdir -p $remote_root/frontend $remote_root/backend $remote_root/scripts/server $remote_root/deploy/systemd $remote_root/deploy/caddy"
 
 if [[ "$backend_only" != true ]]; then
@@ -261,13 +266,9 @@ if [[ "$frontend_only" != true ]]; then
   run scp -r \
     "$backend_path/jarad_backend" \
     "$backend_path/requirements.txt" \
+    "$backend_path/requirements.lock" \
     "$backend_path/README.md" \
     "$remote:$remote_root/backend/"
-  if [[ -f "$backend_path/requirements.lock" ]]; then
-    run scp "$backend_path/requirements.lock" "$remote:$remote_root/backend/requirements.lock"
-  else
-    run ssh "$remote" "rm -f $remote_root/backend/requirements.lock"
-  fi
 
   run scp "$server_scripts_path/restart-backend.sh" "$remote:$remote_root/scripts/server/restart-backend.sh"
   run scp "$server_scripts_path/install-systemd.sh" "$remote:$remote_root/scripts/server/install-systemd.sh"
@@ -295,7 +296,7 @@ verify_deploy_manifest
 
 if [[ "$install_backend_deps" == true ]]; then
   echo "Installing backend dependencies..."
-  run ssh "$remote" "cd $remote_root/backend && if [ -f .env ]; then chmod 600 .env; fi && python3 -m venv .venv && . .venv/bin/activate && if [ -f requirements.lock ]; then pip install --require-hashes -r requirements.lock; else pip install -r requirements.txt; fi"
+  run ssh "$remote" "cd $remote_root/backend && if [ -f .env ]; then chmod 600 .env; fi && test -f requirements.lock && python3 -m venv .venv && . .venv/bin/activate && pip install --require-hashes -r requirements.lock"
 fi
 
 if [[ "$install_services" == true ]]; then
