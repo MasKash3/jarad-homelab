@@ -22,7 +22,6 @@ from .models import (
     DeviceTokenRotateRequest,
     DnsClientApproveRequest,
     DnsClientLabelRequest,
-    TotpCheckRequest,
     WebAuthnAuthenticateOptionsRequest,
     WebAuthnAuthenticateVerifyRequest,
     WebAuthnCredentialDeleteRequest,
@@ -72,25 +71,6 @@ def require_credential_management_auth(totp_code: str | None, request: Request, 
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "host": socket.gethostname()}
-
-
-@router.post("/api/auth/totp/check", dependencies=protected)
-def check_totp(payload: TotpCheckRequest, request: Request) -> dict[str, Any]:
-    enforce_rate_limit(request, bucket="totp-check", limit=6, window_seconds=60)
-    configured = bool(TOTP_SECRET)
-    valid = verify_totp_for_actor(payload.code, request, consume=False) if configured else False
-    audit_event(
-        "totp.check",
-        "success" if valid else "failure",
-        request=request,
-        details={"configured": configured},
-    )
-    return {
-        "configured": configured,
-        "valid": valid,
-        "serverTime": datetime.now(timezone.utc).isoformat(),
-        "codeWindowSeconds": 30,
-    }
 
 
 @router.get("/api/auth/devices", dependencies=protected)

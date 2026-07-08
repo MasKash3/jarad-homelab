@@ -12,6 +12,7 @@ from typing import Deque
 
 from fastapi import Cookie, Header, HTTPException, Request
 
+from .audit import audit_event
 from .config import ALLOWED_ORIGINS, APP_TOKEN, TOTP_SECRET
 from .models import ActionRequest
 from .webauthn_auth import consume_action_token
@@ -131,22 +132,32 @@ def verify_action_auth(payload: ActionRequest, action_id: str, service_id: str, 
     raise HTTPException(status_code=400, detail="Choose TOTP before running this action")
 
 
-def verify_totp(code: str) -> bool:
-    return matching_totp_step(code) is not None
-
-
 def verify_totp_for_actor(code: str, request: Request, *, consume: bool) -> bool:
     actor = totp_actor(request)
     now = time.monotonic()
-    ensure_totp_not_locked(actor, now)
+    ensure_totp_not_locked(actor, now, request)
 
     matched_step = matching_totp_step(code)
     if matched_step is None:
-        record_totp_failure(actor, now)
+        lockout_seconds = record_totp_failure(actor, now)
+        if lockout_seconds:
+            audit_event(
+                "totp.lockout",
+                "activated",
+                request=request,
+                details={"retry_after_seconds": lockout_seconds},
+            )
         return False
 
     if consume and not consume_totp_step(actor, matched_step, code, now):
-        record_totp_failure(actor, now)
+        lockout_seconds = record_totp_failure(actor, now)
+        if lockout_seconds:
+            audit_event(
+                "totp.lockout",
+                "activated",
+                request=request,
+                details={"retry_after_seconds": lockout_seconds},
+            )
         return False
 
     record_totp_success(actor)
@@ -171,7 +182,7 @@ def totp_actor(request: Request) -> str:
     return getattr(request.state, "auth_actor", None) or "unknown"
 
 
-def ensure_totp_not_locked(actor: str, now: float) -> None:
+def ensure_totp_not_locked(actor: str, now: float, request: Request) -> None:
     with _totp_lock:
         locked_until = _totp_lockouts.get(actor, 0.0)
         if locked_until <= now:
@@ -179,6 +190,12 @@ def ensure_totp_not_locked(actor: str, now: float) -> None:
                 _totp_lockouts.pop(actor, None)
             return
         retry_after = max(1, round(locked_until - now))
+    audit_event(
+        "totp.lockout",
+        "blocked",
+        request=request,
+        details={"retry_after_seconds": retry_after},
+    )
     raise HTTPException(
         status_code=429,
         detail="Too many invalid TOTP attempts. Try again shortly.",
@@ -186,7 +203,7 @@ def ensure_totp_not_locked(actor: str, now: float) -> None:
     )
 
 
-def record_totp_failure(actor: str, now: float) -> None:
+def record_totp_failure(actor: str, now: float) -> int | None:
     cutoff = now - TOTP_FAILURE_WINDOW_SECONDS
     with _totp_lock:
         failures = _totp_failures.setdefault(actor, deque())
@@ -194,13 +211,14 @@ def record_totp_failure(actor: str, now: float) -> None:
             failures.popleft()
         failures.append(now)
         if len(failures) < TOTP_FAILURE_LIMIT:
-            return
+            return None
 
         lockout_count = _totp_lockout_counts.get(actor, 0) + 1
         lockout_seconds = min(TOTP_LOCKOUT_BASE_SECONDS * (2 ** (lockout_count - 1)), TOTP_LOCKOUT_MAX_SECONDS)
         _totp_lockout_counts[actor] = lockout_count
         _totp_lockouts[actor] = now + lockout_seconds
         failures.clear()
+        return lockout_seconds
 
 
 def record_totp_success(actor: str) -> None:

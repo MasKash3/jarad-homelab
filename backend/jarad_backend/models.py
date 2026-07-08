@@ -13,10 +13,6 @@ class ActionRequest(BaseModel):
     actionAuthToken: str | None = None
 
 
-class TotpCheckRequest(BaseModel):
-    code: str
-
-
 class WebAuthnRegisterOptionsRequest(BaseModel):
     deviceLabel: str | None = None
     totpCode: str | None = None
