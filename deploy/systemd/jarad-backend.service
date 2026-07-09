@@ -13,7 +13,7 @@ Environment=JARAD_BACKEND_HOST=127.0.0.1
 Environment=JARAD_BACKEND_PORT=8443
 Environment=JARAD_DOCKER_HELPER=/usr/local/sbin/jarad-docker
 Environment=JARAD_DB_PATH=/var/lib/jarad/jarad.sqlite3
-ExecStart=/opt/jarad/app/.venv/bin/uvicorn jarad_backend.main:app --host ${JARAD_BACKEND_HOST} --port ${JARAD_BACKEND_PORT}
+ExecStart=/opt/jarad/app/.venv/bin/python -m uvicorn jarad_backend.main:app --host ${JARAD_BACKEND_HOST} --port ${JARAD_BACKEND_PORT}
 Restart=on-failure
 RestartSec=5
 UMask=0077
