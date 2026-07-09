@@ -11,8 +11,8 @@ def ensure_private_env_file(env_path: Path) -> None:
         return
 
     mode = env_path.stat().st_mode & 0o777
-    if mode & 0o077:
-        raise RuntimeError(f"Refusing to start because {env_path} permissions are too broad. Run: chmod 600 {env_path}")
+    if mode & 0o007 or mode & 0o030:
+        raise RuntimeError(f"Refusing to start because {env_path} permissions are too broad. Run: chmod 600 or 640 {env_path}")
 
 
 def load_dotenv() -> None:
