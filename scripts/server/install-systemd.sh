@@ -38,6 +38,17 @@ if [ ! -d "$TEMPLATE_DIR" ]; then
   exit 1
 fi
 
+mapfile -t residual_env_files < <(
+  find "$REMOTE_ROOT/backend" -maxdepth 1 -type f \
+    \( -name '.env.*' -o -name '.env~' -o -name '*.env.bak*' -o -name '*.env.old*' \) \
+    ! -name '.env.example' -print
+)
+if (( ${#residual_env_files[@]} > 0 )); then
+  echo "Plaintext environment backup files were found; remove or encrypt them before installing services:" >&2
+  printf '  %s\n' "${residual_env_files[@]}" >&2
+  exit 1
+fi
+
 ensure_service_account "$BACKEND_USER"
 ensure_service_account "$FRONTEND_USER"
 
