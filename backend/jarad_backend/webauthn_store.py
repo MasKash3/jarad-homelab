@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import BROWSER_SESSION_TTL_MINUTES, DB_PATH, DEVICE_TOKEN_TTL_DAYS
-from .file_security import ensure_owner_only_file
+from .file_security import ensure_owner_only_file, verify_private_database_path
 
 
 CHALLENGE_TTL_SECONDS = 180
@@ -38,9 +38,12 @@ class WebAuthnStore:
 
     def connect(self) -> sqlite3.Connection:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        verify_private_database_path(self.db_path)
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
         ensure_owner_only_file(self.db_path)
+        verify_private_database_path(self.db_path)
+        connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
     def init(self) -> None:
@@ -148,6 +151,10 @@ class WebAuthnStore:
             db.execute("CREATE INDEX IF NOT EXISTS idx_browser_sessions_device_id ON browser_sessions(device_id)")
             db.execute("CREATE INDEX IF NOT EXISTS idx_browser_sessions_expires_at ON browser_sessions(expires_at)")
             self.cleanup_expired_auth_rows(db)
+            integrity_result = db.execute("PRAGMA quick_check").fetchone()
+            if not integrity_result or integrity_result[0] != "ok":
+                detail = integrity_result[0] if integrity_result else "no result"
+                raise RuntimeError(f"SQLite database integrity check failed: {detail}")
 
     def ensure_webauthn_security_columns(self, db: sqlite3.Connection) -> None:
         challenge_columns = {row["name"] for row in db.execute("PRAGMA table_info(webauthn_challenges)").fetchall()}
