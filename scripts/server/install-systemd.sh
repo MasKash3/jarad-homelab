@@ -17,6 +17,22 @@ ensure_service_account() {
   fi
 }
 
+verify_loopback_listener() {
+  local service_name="$1"
+  local port="$2"
+  local listeners
+
+  listeners="$(ss -H -ltn "sport = :$port" 2>/dev/null || true)"
+  if [ -z "$listeners" ]; then
+    echo "$service_name did not open its expected localhost port $port." >&2
+    return 1
+  fi
+  if awk '{ print $4 }' <<<"$listeners" | grep -Evq '^(127\.0\.0\.1|\[::1\]):[0-9]+$'; then
+    echo "$service_name port $port is exposed beyond localhost; refusing this service installation." >&2
+    return 1
+  fi
+}
+
 if [ ! -d "$TEMPLATE_DIR" ]; then
   echo "Missing systemd template directory: $TEMPLATE_DIR" >&2
   exit 1
@@ -116,5 +132,8 @@ if sudo -u "$FRONTEND_USER" test -r "$REMOTE_ROOT/backend/.env"; then
 fi
 sudo systemctl enable --now jarad-backend.service
 sudo systemctl enable --now jarad-frontend.service
+
+verify_loopback_listener jarad-backend.service 8443
+verify_loopback_listener jarad-frontend.service 5178
 
 echo "Installed and started jarad-backend.service and jarad-frontend.service."

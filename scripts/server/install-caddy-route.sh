@@ -12,6 +12,25 @@ if [ -z "$TAILSCALE_DOMAIN" ]; then
   exit 1
 fi
 
+if (( ${#TAILSCALE_DOMAIN} > 253 )) \
+  || [[ ! "$TAILSCALE_DOMAIN" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] \
+  || [[ "$TAILSCALE_DOMAIN" != *.* || "$TAILSCALE_DOMAIN" == *..* || "$TAILSCALE_DOMAIN" == *"*"* ]]; then
+  echo "Caddy domain must be one exact DNS hostname without a wildcard." >&2
+  exit 1
+fi
+IFS='.' read -r -a domain_labels <<<"$TAILSCALE_DOMAIN"
+for label in "${domain_labels[@]}"; do
+  if (( ${#label} > 63 )) || [[ ! "$label" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
+    echo "Caddy domain contains an invalid DNS label." >&2
+    exit 1
+  fi
+done
+
+if [[ ! "$APP_PORT" =~ ^[0-9]+$ ]] || (( APP_PORT < 1 || APP_PORT > 65535 )); then
+  echo "Caddy app port must be an integer from 1 to 65535." >&2
+  exit 1
+fi
+
 if [ ! -f "$TEMPLATE" ]; then
   echo "Missing Caddy template: $TEMPLATE" >&2
   exit 1
