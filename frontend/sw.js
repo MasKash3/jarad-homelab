@@ -1,15 +1,15 @@
-const CACHE_NAME = "jarad-2026.07.04.2";
+const CACHE_NAME = "jarad-2026.07.11.1";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=2026.07.04.2",
-  "./js/error-handler.js?v=2026.07.04.2",
-  "./js/api.js?v=2026.07.04.2",
-  "./js/auth.js?v=2026.07.04.2",
-  "./js/config.js?v=2026.07.04.2",
-  "./js/empty-state.js?v=2026.07.04.2",
-  "./js/utils.js?v=2026.07.04.2",
-  "./app.js?v=2026.07.04.2",
+  "./styles.css?v=2026.07.11.1",
+  "./js/error-handler.js?v=2026.07.11.1",
+  "./js/api.js?v=2026.07.11.1",
+  "./js/auth.js?v=2026.07.11.1",
+  "./js/config.js?v=2026.07.11.1",
+  "./js/empty-state.js?v=2026.07.11.1",
+  "./js/utils.js?v=2026.07.11.1",
+  "./app.js?v=2026.07.11.1",
   "./manifest.webmanifest",
   "./icons/icon-192.svg",
   "./icons/icon-512.svg"
@@ -32,7 +32,8 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  const scopePath = new URL(self.registration.scope).pathname;
+  if (url.origin !== self.location.origin || !url.pathname.startsWith(scopePath) || url.pathname.startsWith("/api/")) return;
 
   const isStaticAsset = ASSETS.some((asset) => {
     const assetUrl = new URL(asset, self.location.origin);

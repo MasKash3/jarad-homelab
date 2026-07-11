@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.04.2';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.04.2';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.04.2';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.04.2';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.04.2';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.11.1';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.11.1';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.11.1';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.11.1';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.11.1';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -1002,6 +1002,27 @@ function resolveTotpManagement(value) {
   resolve(value);
 }
 
+async function resetLocalAppData() {
+  const confirmed = window.confirm(
+    "Reset this browser's Jarad app data? You will need to reconnect and authenticate again."
+  );
+  if (!confirmed) return;
+
+  if ("serviceWorker" in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  }
+  if ("caches" in window) {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+  }
+  sessionStorage.clear();
+  localStorage.clear();
+  const recoveryUrl = new URL(window.location.href);
+  recoveryUrl.searchParams.set("recovered", Date.now().toString());
+  window.location.replace(recoveryUrl.href);
+}
+
 function submitTotpManagement() {
   const value = $("#totpManageInput").value.trim();
   if (!/^\d{6}$/.test(value)) {
@@ -1082,6 +1103,12 @@ function bindEvents() {
   });
   $("#registerPasskeyButton")?.addEventListener("click", registerThisDevicePasskey);
   $("#registerDeviceTokenButton")?.addEventListener("click", registerThisDeviceToken);
+  $("#resetLocalAppButton")?.addEventListener("click", () => {
+    resetLocalAppData().catch((error) => {
+      addAudit("PWA recovery failed", "local app", "failure", error.message);
+      window.alert("Local app reset failed. Clear this site's data in your browser settings.");
+    });
+  });
 
   $("#clearAuditButton").addEventListener("click", () => {
     localStorage.removeItem(storageKeys.audit);
@@ -1111,7 +1138,7 @@ function bindEvents() {
 }
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  navigator.serviceWorker.register("./sw.js", { scope: "./", updateViaCache: "none" }).catch(() => {});
 }
 
 migrateLegacyStorage();
