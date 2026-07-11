@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.11.1';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.11.1';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.11.1';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.11.1';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.11.1';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.11.2';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.11.2';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.11.2';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.11.2';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.11.2';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -44,6 +44,26 @@ function migrateLegacyStorage() {
     const legacyValue = localStorage.getItem(legacyKey);
     if (legacyValue !== null) localStorage.setItem(nextKey, legacyValue);
   });
+}
+
+function clearSavedProductionBackendUrls() {
+  if (!hasAutoBackend()) return;
+  let cleared = false;
+  [storageKeys.settings, legacyStorageKeys.settings].forEach((key) => {
+    try {
+      const settings = JSON.parse(localStorage.getItem(key)) || {};
+      if (!settings.baseUrl) return;
+      localStorage.setItem(key, JSON.stringify({ ...settings, baseUrl: "" }));
+      cleared = true;
+    } catch {
+      localStorage.removeItem(key);
+      cleared = true;
+    }
+  });
+  if (cleared) {
+    clearBrowserSession();
+    addAudit("Cleared custom backend URL", "backend", "warning", "Production now uses this HTTPS origin");
+  }
 }
 
 function readSettings() {
@@ -420,7 +440,12 @@ function renderAudit() {
 
 function renderSettings() {
   const settings = readSettings();
-  $("#apiBaseInput").value = settings.baseUrl || "";
+  const productionSameOrigin = hasAutoBackend();
+  $("#apiBaseInput").value = productionSameOrigin ? "" : settings.baseUrl || "";
+  $("#apiBaseInput").disabled = productionSameOrigin;
+  $("#apiBaseInput").placeholder = productionSameOrigin
+    ? "Using this HTTPS origin"
+    : "Leave blank to use this origin";
   $("#apiTokenInput").value = settings.token || "";
   const validation = validateBackendBaseUrl(settings.baseUrl);
   renderSettingsError(validation.ok ? "" : `${validation.message} The app is using this HTTPS origin instead.`);
@@ -1142,6 +1167,7 @@ if ("serviceWorker" in navigator) {
 }
 
 migrateLegacyStorage();
+clearSavedProductionBackendUrls();
 bindEvents();
 refreshState();
 refreshPasskeys();
