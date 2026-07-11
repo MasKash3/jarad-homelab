@@ -126,7 +126,8 @@ def verify_action_auth(payload: ActionRequest, action_id: str, service_id: str, 
     if method == "fingerprint":
         if not payload.actionAuthToken:
             raise HTTPException(status_code=401, detail="Missing WebAuthn action authorization")
-        if not consume_action_token(payload.actionAuthToken, action_id, service_id):
+        actor_id = getattr(request.state, "auth_actor", None) or "unknown"
+        if not consume_action_token(payload.actionAuthToken, action_id, service_id, actor_id):
             raise HTTPException(status_code=401, detail="Invalid or expired WebAuthn action authorization")
         return
     raise HTTPException(status_code=400, detail="Choose TOTP before running this action")

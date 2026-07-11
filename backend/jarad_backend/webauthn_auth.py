@@ -44,7 +44,7 @@ def options_payload(options: Any) -> dict[str, Any]:
     return json.loads(options_to_json(options))
 
 
-def begin_registration(device_label: str | None) -> dict[str, Any]:
+def begin_registration(device_label: str | None, actor_id: str) -> dict[str, Any]:
     user_handle = secrets.token_urlsafe(16)
     existing_credentials = [
         PublicKeyCredentialDescriptor(id=b64url_decode(item["credential_id"]))
@@ -66,6 +66,7 @@ def begin_registration(device_label: str | None) -> dict[str, Any]:
         challenge=b64url_decode(payload["challenge"]),
         purpose="registration",
         user_handle=user_handle,
+        actor_id=actor_id,
     )
     return {
         "challengeId": challenge_id,
@@ -76,8 +77,10 @@ def begin_registration(device_label: str | None) -> dict[str, Any]:
     }
 
 
-def finish_registration(challenge_id: str, credential: dict[str, Any], device_label: str | None) -> dict[str, Any]:
-    challenge = store.consume_challenge(challenge_id, "registration")
+def finish_registration(
+    challenge_id: str, credential: dict[str, Any], device_label: str | None, actor_id: str
+) -> dict[str, Any]:
+    challenge = store.consume_challenge(challenge_id, "registration", actor_id)
     if not challenge:
         raise HTTPException(status_code=400, detail="Registration challenge expired or already used")
 
@@ -107,7 +110,7 @@ def finish_registration(challenge_id: str, credential: dict[str, Any], device_la
     return {"credentialId": credential_id, "deviceLabel": device_label or "This device"}
 
 
-def begin_authentication(action_id: str | None, service_id: str | None) -> dict[str, Any]:
+def begin_authentication(action_id: str | None, service_id: str | None, actor_id: str) -> dict[str, Any]:
     credentials = store.list_credentials()
     if not credentials:
         raise HTTPException(status_code=400, detail="No passkeys are registered")
@@ -126,6 +129,7 @@ def begin_authentication(action_id: str | None, service_id: str | None) -> dict[
         purpose="authentication",
         action_id=action_id,
         service_id=service_id,
+        actor_id=actor_id,
     )
     return {
         "challengeId": challenge_id,
@@ -141,8 +145,9 @@ def finish_authentication(
     credential: dict[str, Any],
     action_id: str | None,
     service_id: str | None,
+    actor_id: str,
 ) -> dict[str, Any]:
-    challenge = store.consume_challenge(challenge_id, "authentication")
+    challenge = store.consume_challenge(challenge_id, "authentication", actor_id)
     if not challenge:
         raise HTTPException(status_code=400, detail="Authentication challenge expired or already used")
     if challenge["action_id"] and challenge["action_id"] != action_id:
@@ -171,7 +176,7 @@ def finish_authentication(
     store.update_credential_use(credential_id, verification.new_sign_count)
     action_token = None
     if action_id:
-        action_token = store.create_action_authorization(action_id=action_id, service_id=service_id)
+        action_token = store.create_action_authorization(action_id=action_id, service_id=service_id, actor_id=actor_id)
     return {"verified": True, "credentialId": credential_id, "actionAuthToken": action_token}
 
 
@@ -193,5 +198,7 @@ def remove_registered_credential(credential_id: str) -> None:
         raise HTTPException(status_code=404, detail="Unknown passkey")
 
 
-def consume_action_token(token: str, action_id: str, service_id: str | None) -> bool:
-    return store.consume_action_authorization(token=token, action_id=action_id, service_id=service_id)
+def consume_action_token(token: str, action_id: str, service_id: str | None, actor_id: str) -> bool:
+    return store.consume_action_authorization(
+        token=token, action_id=action_id, service_id=service_id, actor_id=actor_id
+    )

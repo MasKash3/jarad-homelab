@@ -208,7 +208,7 @@ def webauthn_register_options(payload: WebAuthnRegisterOptionsRequest, request: 
     enforce_rate_limit(request, bucket="webauthn-register-options", limit=20, window_seconds=300)
     try:
         require_credential_management_auth(payload.totpCode, request, consume=False)
-        return begin_registration(payload.deviceLabel)
+        return begin_registration(payload.deviceLabel, request.state.auth_actor)
     except HTTPException as exc:
         audit_event(
             "passkey.registration",
@@ -224,7 +224,9 @@ def webauthn_register_verify(payload: WebAuthnRegisterVerifyRequest, request: Re
     enforce_rate_limit(request, bucket="webauthn-register-verify", limit=20, window_seconds=300)
     try:
         require_credential_management_auth(payload.totpCode, request, consume=True)
-        result = finish_registration(payload.challengeId, payload.credential, payload.deviceLabel)
+        result = finish_registration(
+            payload.challengeId, payload.credential, payload.deviceLabel, request.state.auth_actor
+        )
     except HTTPException as exc:
         audit_event(
             "passkey.registration",
@@ -271,7 +273,7 @@ def webauthn_delete_credential(credential_id: str, payload: WebAuthnCredentialDe
 def webauthn_authenticate_options(payload: WebAuthnAuthenticateOptionsRequest, request: Request) -> dict[str, Any]:
     enforce_rate_limit(request, bucket="webauthn-authenticate", limit=12, window_seconds=60)
     try:
-        return begin_authentication(payload.actionId, payload.serviceId)
+        return begin_authentication(payload.actionId, payload.serviceId, request.state.auth_actor)
     except HTTPException as exc:
         audit_event(
             "webauthn.authentication",
@@ -279,6 +281,7 @@ def webauthn_authenticate_options(payload: WebAuthnAuthenticateOptionsRequest, r
             request=request,
             action_id=payload.actionId,
             service_id=payload.serviceId,
+            actor_id=request.state.auth_actor,
             details={"stage": "options", "status_code": exc.status_code, "detail": exc.detail},
         )
         raise

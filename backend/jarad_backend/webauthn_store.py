@@ -68,6 +68,7 @@ class WebAuthnStore:
                     user_handle TEXT,
                     action_id TEXT,
                     service_id TEXT,
+                    actor_id TEXT,
                     created_at TEXT NOT NULL,
                     expires_at TEXT NOT NULL,
                     used_at TEXT
@@ -80,12 +81,14 @@ class WebAuthnStore:
                     token TEXT PRIMARY KEY,
                     action_id TEXT NOT NULL,
                     service_id TEXT,
+                    actor_id TEXT,
                     created_at TEXT NOT NULL,
                     expires_at TEXT NOT NULL,
                     used_at TEXT
                 )
                 """
             )
+            self.ensure_webauthn_security_columns(db)
             db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS audit_events (
@@ -146,6 +149,16 @@ class WebAuthnStore:
             db.execute("CREATE INDEX IF NOT EXISTS idx_browser_sessions_expires_at ON browser_sessions(expires_at)")
             self.cleanup_expired_auth_rows(db)
 
+    def ensure_webauthn_security_columns(self, db: sqlite3.Connection) -> None:
+        challenge_columns = {row["name"] for row in db.execute("PRAGMA table_info(webauthn_challenges)").fetchall()}
+        if "actor_id" not in challenge_columns:
+            db.execute("ALTER TABLE webauthn_challenges ADD COLUMN actor_id TEXT")
+        authorization_columns = {
+            row["name"] for row in db.execute("PRAGMA table_info(action_authorizations)").fetchall()
+        }
+        if "actor_id" not in authorization_columns:
+            db.execute("ALTER TABLE action_authorizations ADD COLUMN actor_id TEXT")
+
     def ensure_device_token_columns(self, db: sqlite3.Connection) -> None:
         columns = {row["name"] for row in db.execute("PRAGMA table_info(device_tokens)").fetchall()}
         now = utc_now()
@@ -165,6 +178,7 @@ class WebAuthnStore:
         user_handle: str | None = None,
         action_id: str | None = None,
         service_id: str | None = None,
+        actor_id: str,
     ) -> str:
         now = utc_now()
         challenge_id = secrets.token_urlsafe(24)
@@ -172,8 +186,8 @@ class WebAuthnStore:
             db.execute(
                 """
                 INSERT INTO webauthn_challenges
-                    (challenge_id, challenge, purpose, user_handle, action_id, service_id, created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (challenge_id, challenge, purpose, user_handle, action_id, service_id, actor_id, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     challenge_id,
@@ -182,22 +196,23 @@ class WebAuthnStore:
                     user_handle,
                     action_id,
                     service_id,
+                    actor_id,
                     iso(now),
                     iso(now + timedelta(seconds=CHALLENGE_TTL_SECONDS)),
                 ),
             )
         return challenge_id
 
-    def consume_challenge(self, challenge_id: str, purpose: str) -> dict[str, Any] | None:
+    def consume_challenge(self, challenge_id: str, purpose: str, actor_id: str) -> dict[str, Any] | None:
         now = utc_now()
         now_iso = iso(now)
         with self.connect() as db:
             row = db.execute(
                 """
                 SELECT * FROM webauthn_challenges
-                WHERE challenge_id = ? AND purpose = ? AND used_at IS NULL
+                WHERE challenge_id = ? AND purpose = ? AND actor_id = ? AND used_at IS NULL
                 """,
-                (challenge_id, purpose),
+                (challenge_id, purpose, actor_id),
             ).fetchone()
             if not row or parse_iso(row["expires_at"]) <= now:
                 return None
@@ -207,10 +222,11 @@ class WebAuthnStore:
                 SET used_at = ?
                 WHERE challenge_id = ?
                   AND purpose = ?
+                  AND actor_id = ?
                   AND used_at IS NULL
                   AND expires_at > ?
                 """,
-                (now_iso, challenge_id, purpose, now_iso),
+                (now_iso, challenge_id, purpose, actor_id, now_iso),
             )
             if result.rowcount != 1:
                 return None
@@ -269,7 +285,7 @@ class WebAuthnStore:
                 (sign_count, iso(utc_now()), credential_id),
             )
 
-    def create_action_authorization(self, *, action_id: str, service_id: str | None) -> str:
+    def create_action_authorization(self, *, action_id: str, service_id: str | None, actor_id: str) -> str:
         now = utc_now()
         token = secrets.token_urlsafe(32)
         token_hash = hash_action_token(token)
@@ -278,14 +294,16 @@ class WebAuthnStore:
             db.execute(
                 """
                 INSERT INTO action_authorizations
-                    (token, action_id, service_id, created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?)
+                    (token, action_id, service_id, actor_id, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (token_hash, action_id, service_id, iso(now), iso(now + timedelta(seconds=ACTION_AUTH_TTL_SECONDS))),
+                (token_hash, action_id, service_id, actor_id, iso(now), iso(now + timedelta(seconds=ACTION_AUTH_TTL_SECONDS))),
             )
         return token
 
-    def consume_action_authorization(self, *, token: str, action_id: str, service_id: str | None) -> bool:
+    def consume_action_authorization(
+        self, *, token: str, action_id: str, service_id: str | None, actor_id: str
+    ) -> bool:
         now = utc_now()
         now_iso = iso(now)
         token_hash = hash_action_token(token)
@@ -296,11 +314,12 @@ class WebAuthnStore:
                 SET used_at = ?
                 WHERE token = ?
                   AND action_id = ?
+                  AND actor_id = ?
                   AND used_at IS NULL
                   AND expires_at > ?
                   AND ((service_id IS NULL AND ? IS NULL) OR service_id = ?)
                 """,
-                (now_iso, token_hash, action_id, now_iso, service_id, service_id),
+                (now_iso, token_hash, action_id, actor_id, now_iso, service_id, service_id),
             )
             return result.rowcount == 1
 
