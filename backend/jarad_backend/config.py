@@ -43,8 +43,14 @@ def env(name: str, default: str, legacy_name: str | None = None) -> str:
 PLACEHOLDER_APP_TOKEN = "change-this-long-random-token"
 ALLOW_INSECURE_DEFAULTS = env("JARAD_ALLOW_INSECURE_DEFAULTS", "0", "HOMELAB_ALLOW_INSECURE_DEFAULTS") == "1"
 APP_TOKEN = env("JARAD_APP_TOKEN", "", "HOMELAB_APP_TOKEN")
-if (not APP_TOKEN or APP_TOKEN == PLACEHOLDER_APP_TOKEN or len(APP_TOKEN) < 32) and not ALLOW_INSECURE_DEFAULTS:
+if (not APP_TOKEN or APP_TOKEN == PLACEHOLDER_APP_TOKEN) and not ALLOW_INSECURE_DEFAULTS:
     raise RuntimeError("Set JARAD_APP_TOKEN to a long random value before starting Jarad Backend.")
+if APP_TOKEN and APP_TOKEN != PLACEHOLDER_APP_TOKEN and len(APP_TOKEN) < 32:
+    warnings.warn(
+        "JARAD_APP_TOKEN is shorter than 32 characters; rotate it to a long random value.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
 if ALLOW_INSECURE_DEFAULTS:
     warnings.warn(
         "JARAD_ALLOW_INSECURE_DEFAULTS is enabled; this mode is for isolated local development only.",
