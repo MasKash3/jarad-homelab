@@ -283,7 +283,6 @@ if [[ "$frontend_only" != true ]]; then
   run scp "$caddy_path/jarad.Caddyfile" "$remote:$remote_root/deploy/caddy/jarad.Caddyfile"
 
   run ssh "$remote" "chmod +x $remote_root/scripts/server/restart-backend.sh $remote_root/scripts/server/install-systemd.sh $remote_root/scripts/server/install-caddy-route.sh $remote_root/scripts/server/jarad-dns-access $remote_root/scripts/server/jarad-docker"
-  run ssh "$remote" "if [ -f $remote_root/backend/.env ]; then chmod 600 $remote_root/backend/.env; fi"
 fi
 
 if [[ "$install_caddy" == true && "$frontend_only" == true ]]; then
@@ -298,7 +297,7 @@ verify_deploy_manifest
 
 if [[ "$install_backend_deps" == true ]]; then
   echo "Installing backend dependencies..."
-  run ssh "$remote" "cd $remote_root/backend && if [ -f .env ]; then chmod 600 .env; fi && test -f requirements.lock && python3 -m venv .venv && . .venv/bin/activate && pip install --require-hashes -r requirements.lock"
+  run ssh "$remote" "cd $remote_root/backend && test -f requirements.lock && python3 -m venv .venv && . .venv/bin/activate && pip install --require-hashes -r requirements.lock"
 fi
 
 if [[ "$install_services" == true ]]; then
