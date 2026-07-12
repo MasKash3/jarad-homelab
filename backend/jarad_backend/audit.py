@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import Request
 
 from .request_address import client_addr
+from .redaction import redact_sensitive_text
 from .webauthn_store import WebAuthnStore
 
 
@@ -55,7 +56,7 @@ def _safe_details(details: dict[str, Any]) -> dict[str, Any]:
     for key, value in details.items():
         if value is None:
             continue
-        safe[_clamp(str(key), 80)] = _clamp(str(value), 240)
+        safe[_clamp(str(key), 80)] = _clamp(redact_sensitive_text(value), 240)
     return safe
 
 

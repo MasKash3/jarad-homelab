@@ -29,6 +29,7 @@ from .models import (
     WebAuthnRegisterVerifyRequest,
 )
 from .rate_limit import enforce_rate_limit
+from .redaction import redact_sensitive_text
 from .services import alerts_for, build_services, network_state, recent_logs
 from .webauthn_auth import (
     begin_authentication,
@@ -643,7 +644,7 @@ def service_action(action_id: str, payload: ActionRequest, request: Request) -> 
 
     result = docker_action(action, service_id)
     if not result or result.returncode != 0:
-        detail = result.stderr.strip() if result else "Docker command unavailable"
+        detail = redact_sensitive_text(result.stderr.strip()) if result else "Docker command unavailable"
         audit_event(
             "docker.action",
             "failure",

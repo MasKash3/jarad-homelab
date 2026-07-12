@@ -9,6 +9,7 @@ from .command import run_command
 from .config import BACKUP_LOG, DATA_MOUNT, DNS_SERVER, PUBLIC_HOST, SERVICES
 from .docker import docker_ps, docker_restarts, docker_started_at, docker_stats
 from .logtail import tail_lines
+from .redaction import redact_sensitive_text
 
 
 def build_services() -> list[dict[str, Any]]:
@@ -130,7 +131,14 @@ def recent_logs(limit: int = 80) -> list[dict[str, str]]:
         for line in tail_lines(BACKUP_LOG, limit):
             last_time = backup_log_time(line) or last_time
             level = "error" if "error" in line.lower() or "failed" in line.lower() else "info"
-            rows.append({"level": level, "service": "backup", "time": last_time, "message": line[-180:]})
+            rows.append(
+                {
+                    "level": level,
+                    "service": "backup",
+                    "time": last_time,
+                    "message": redact_sensitive_text(line)[-180:],
+                }
+            )
 
     if not rows:
         rows.append(

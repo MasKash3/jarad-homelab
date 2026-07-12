@@ -10,6 +10,7 @@ from typing import Any
 from .command import run_command
 from .config import DB_PATH, DNS_ACCESS_ENABLED, DNS_ACCESS_HELPER, DNS_ACCESS_LAN_SUBNET, DNS_ACCESS_SERVER_IP
 from .file_security import ensure_owner_only_file
+from .redaction import redact_sensitive_text
 
 
 VALID_STATUSES = {"pending", "approved", "denied"}
@@ -284,7 +285,11 @@ def collect_detected_clients() -> dict[str, Any]:
     if result is None:
         return {"enabled": True, "processed": 0, "error": "DNS access helper unavailable"}
     if result.returncode != 0:
-        return {"enabled": True, "processed": 0, "error": result.stderr.strip() or "DNS detection failed"}
+        return {
+            "enabled": True,
+            "processed": 0,
+            "error": redact_sensitive_text(result.stderr.strip()) or "DNS detection failed",
+        }
     processed = 0
     try:
         clients = json.loads(result.stdout or "[]")
@@ -325,9 +330,14 @@ def apply_firewall_rules() -> dict[str, Any]:
             "enabled": True,
             "applied": False,
             "allowedIps": allowed_ips,
-            "detail": result.stderr.strip() or "DNS access helper failed",
+            "detail": redact_sensitive_text(result.stderr.strip()) or "DNS access helper failed",
         }
-    return {"enabled": True, "applied": True, "allowedIps": allowed_ips, "detail": (result.stdout or "").strip()}
+    return {
+        "enabled": True,
+        "applied": True,
+        "allowedIps": allowed_ips,
+        "detail": redact_sensitive_text((result.stdout or "").strip()),
+    }
 
 
 def sync_firewall_state() -> dict[str, Any]:

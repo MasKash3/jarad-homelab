@@ -4,6 +4,7 @@ import subprocess
 
 from .command import run_command
 from .config import DOCKER_HELPER, SERVICES
+from .redaction import redact_sensitive_text
 
 
 ALLOWED_DOCKER_ACTIONS = {"start", "restart", "stop"}
@@ -137,7 +138,7 @@ def docker_logs(container: str, limit: int) -> tuple[int, str] | None:
     if not result:
         return None
     combined = "\n".join(part for part in [result.stdout, result.stderr] if part.strip())
-    return result.returncode, combined
+    return result.returncode, redact_sensitive_text(combined)
 
 
 def docker_action(action: str, service_id: str) -> subprocess.CompletedProcess[str] | None:
