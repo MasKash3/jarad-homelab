@@ -288,7 +288,6 @@ def webauthn_authenticate_options(payload: WebAuthnAuthenticateOptionsRequest, r
             request=request,
             action_id=payload.actionId,
             service_id=payload.serviceId,
-            actor_id=request.state.auth_actor,
             details={"stage": "options", "status_code": exc.status_code, "detail": exc.detail},
         )
         raise
@@ -303,6 +302,7 @@ def webauthn_authenticate_verify(payload: WebAuthnAuthenticateVerifyRequest, req
             credential=payload.credential,
             action_id=payload.actionId,
             service_id=payload.serviceId,
+            actor_id=request.state.auth_actor,
         )
     except HTTPException as exc:
         audit_event(
