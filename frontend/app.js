@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.11.2';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.11.2';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.11.2';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.11.2';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.11.2';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.12.1';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.12.1';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.12.1';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.12.1';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.12.1';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -682,6 +682,14 @@ async function executePendingAction() {
   const completedAuth = pendingAuth || {};
   const completedService = pendingService;
 
+  if (completedAction.danger && !confirmDestructiveAction(completedAction)) {
+    addAudit(completedAction.title, completedAction.target, "cancelled", "Final confirmation was not completed");
+    pendingAction = null;
+    pendingService = null;
+    pendingAuth = null;
+    return;
+  }
+
   try {
     let handledSensitiveView = false;
     if (completedAction.kind === "logs" && completedService) {
@@ -725,6 +733,18 @@ async function executePendingAction() {
   pendingAction = null;
   pendingService = null;
   pendingAuth = null;
+}
+
+function confirmDestructiveAction(action) {
+  const confirmationWord = action.kind === "stop"
+    ? "STOP"
+    : action.kind === "dns-deny"
+    ? "DENY"
+    : "REVOKE";
+  const response = window.prompt(
+    `${action.title}\nTarget: ${action.target}\n\nType ${confirmationWord} to execute this destructive action.`
+  );
+  return response === confirmationWord;
 }
 
 async function executeDnsClientAction(action, auth) {
@@ -955,6 +975,11 @@ async function rotateCurrentDeviceToken() {
 
 async function revokeDeviceToken(deviceId) {
   try {
+    const device = deviceTokens.find((item) => item.deviceId === deviceId);
+    const confirmation = window.prompt(
+      `Revoke access for ${device?.deviceLabel || "this device"}? Type REVOKE to continue.`
+    );
+    if (confirmation !== "REVOKE") return;
     const totpCode = await requestTotpForPasskeyManagement("Revoke Device", "Enter your TOTP code to revoke this device token.");
     if (!totpCode) {
       throw new Error("TOTP is required to revoke a device token.");
@@ -994,6 +1019,11 @@ async function registerThisDevicePasskey() {
 
 async function deletePasskey(credentialId) {
   try {
+    const credential = passkeyCredentials.find((item) => item.credentialId === credentialId);
+    const confirmation = window.prompt(
+      `Remove ${credential?.deviceLabel || "this passkey"}? Type REMOVE to continue.`
+    );
+    if (confirmation !== "REMOVE") return;
     const totpCode = await requestTotpForPasskeyManagement("Remove Passkey", "Enter your TOTP code to remove this passkey.");
     if (!totpCode) {
       throw new Error("TOTP is required to remove a passkey.");
