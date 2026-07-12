@@ -49,6 +49,17 @@ if (( ${#residual_env_files[@]} > 0 )); then
   exit 1
 fi
 
+if [ -f "$REMOTE_ROOT/backend/.env" ]; then
+  if grep -Eqi '^[[:space:]]*(JARAD|HOMELAB)_ALLOW_INSECURE_DEFAULTS[[:space:]]*=[[:space:]]*(1|true|yes)[[:space:]]*$' "$REMOTE_ROOT/backend/.env"; then
+    echo "Production service installation refuses ALLOW_INSECURE_DEFAULTS." >&2
+    exit 1
+  fi
+  if grep -Eqi '^[[:space:]]*(JARAD|HOMELAB)_ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP[[:space:]]*=[[:space:]]*(1|true|yes)[[:space:]]*$' "$REMOTE_ROOT/backend/.env"; then
+    echo "Production service installation refuses passkey bootstrap without TOTP." >&2
+    exit 1
+  fi
+fi
+
 ensure_service_account "$BACKEND_USER"
 ensure_service_account "$FRONTEND_USER"
 

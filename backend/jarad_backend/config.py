@@ -43,12 +43,24 @@ def env(name: str, default: str, legacy_name: str | None = None) -> str:
 PLACEHOLDER_APP_TOKEN = "change-this-long-random-token"
 ALLOW_INSECURE_DEFAULTS = env("JARAD_ALLOW_INSECURE_DEFAULTS", "0", "HOMELAB_ALLOW_INSECURE_DEFAULTS") == "1"
 APP_TOKEN = env("JARAD_APP_TOKEN", "", "HOMELAB_APP_TOKEN")
-if not APP_TOKEN or (APP_TOKEN == PLACEHOLDER_APP_TOKEN and not ALLOW_INSECURE_DEFAULTS):
+if (not APP_TOKEN or APP_TOKEN == PLACEHOLDER_APP_TOKEN or len(APP_TOKEN) < 32) and not ALLOW_INSECURE_DEFAULTS:
     raise RuntimeError("Set JARAD_APP_TOKEN to a long random value before starting Jarad Backend.")
+if ALLOW_INSECURE_DEFAULTS:
+    warnings.warn(
+        "JARAD_ALLOW_INSECURE_DEFAULTS is enabled; this mode is for isolated local development only.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
 TOTP_SECRET = "".join(env("JARAD_TOTP_SECRET", "", "HOMELAB_TOTP_SECRET").split())
 ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP = (
     env("JARAD_ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP", "0", "HOMELAB_ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP") == "1"
 )
+if ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP:
+    warnings.warn(
+        "Passkey bootstrap without TOTP is enabled; disable it immediately after initial recovery.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
 
 
 def positive_int_env(name: str, default: str, legacy_name: str | None = None) -> int:
