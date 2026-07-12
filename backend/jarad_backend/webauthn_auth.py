@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import secrets
 from typing import Any
 
@@ -20,12 +21,13 @@ from webauthn.helpers.structs import (
 )
 
 from .config import WEBAUTHN_ORIGIN, WEBAUTHN_RP_ID
-from .webauthn_store import WebAuthnStore
+from .webauthn_store import ACTION_AUTH_TTL_SECONDS, CHALLENGE_TTL_SECONDS, WebAuthnStore
 
 
 RP_NAME = "Jarad"
 ADMIN_USER_NAME = "jarad-admin"
 ADMIN_DISPLAY_NAME = "Jarad Admin"
+logger = logging.getLogger(__name__)
 
 
 store = WebAuthnStore()
@@ -93,6 +95,7 @@ def finish_registration(
             require_user_verification=True,
         )
     except Exception as exc:
+        logger.warning("WebAuthn registration verification failed (%s)", type(exc).__name__)
         raise HTTPException(status_code=401, detail="WebAuthn registration verification failed") from exc
 
     credential_id = b64url_encode(verification.credential_id)
@@ -171,6 +174,7 @@ def finish_authentication(
             require_user_verification=True,
         )
     except Exception as exc:
+        logger.warning("WebAuthn authentication verification failed (%s)", type(exc).__name__)
         raise HTTPException(status_code=401, detail="WebAuthn authentication verification failed") from exc
 
     store.update_credential_use(credential_id, verification.new_sign_count)
@@ -191,6 +195,18 @@ def list_registered_credentials() -> list[dict[str, Any]]:
         }
         for item in store.list_credentials()
     ]
+
+
+def configuration_diagnostics() -> dict[str, Any]:
+    return {
+        "configured": True,
+        "rpId": WEBAUTHN_RP_ID,
+        "origin": WEBAUTHN_ORIGIN,
+        "originMatchesRpId": True,
+        "userVerification": "required",
+        "challengeTtlSeconds": CHALLENGE_TTL_SECONDS,
+        "actionAuthorizationTtlSeconds": ACTION_AUTH_TTL_SECONDS,
+    }
 
 
 def remove_registered_credential(credential_id: str) -> None:

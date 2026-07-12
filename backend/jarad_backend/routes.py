@@ -34,6 +34,7 @@ from .services import alerts_for, build_services, network_state, recent_logs
 from .webauthn_auth import (
     begin_authentication,
     begin_registration,
+    configuration_diagnostics,
     finish_authentication,
     finish_registration,
     list_registered_credentials,
@@ -249,6 +250,11 @@ def webauthn_register_verify(payload: WebAuthnRegisterVerifyRequest, request: Re
 @router.get("/api/auth/webauthn/credentials", dependencies=protected)
 def webauthn_credentials() -> dict[str, Any]:
     return {"credentials": list_registered_credentials()}
+
+
+@router.get("/api/auth/webauthn/diagnostics", dependencies=protected)
+def webauthn_configuration_diagnostics() -> dict[str, Any]:
+    return configuration_diagnostics()
 
 
 @router.delete("/api/auth/webauthn/credentials/{credential_id}", dependencies=protected)

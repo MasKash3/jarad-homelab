@@ -118,6 +118,17 @@ def exact_origin(value: str, setting_name: str) -> str:
 EXPECTED_HTTPS_ORIGIN = exact_origin(WEBAUTHN_ORIGIN, "JARAD_WEBAUTHN_ORIGIN")
 if not EXPECTED_HTTPS_ORIGIN.startswith("https://"):
     raise RuntimeError("JARAD_WEBAUTHN_ORIGIN must use HTTPS.")
+if (
+    not WEBAUTHN_RP_ID
+    or WEBAUTHN_RP_ID != WEBAUTHN_RP_ID.lower()
+    or any(character in WEBAUTHN_RP_ID for character in ":/ ")
+    or WEBAUTHN_RP_ID.startswith(".")
+    or WEBAUTHN_RP_ID.endswith(".")
+):
+    raise RuntimeError("JARAD_WEBAUTHN_RP_ID must be a lowercase DNS hostname without a scheme, port, or path.")
+_webauthn_origin_host = urlsplit(EXPECTED_HTTPS_ORIGIN).hostname or ""
+if _webauthn_origin_host != WEBAUTHN_RP_ID and not _webauthn_origin_host.endswith(f".{WEBAUTHN_RP_ID}"):
+    raise RuntimeError("JARAD_WEBAUTHN_RP_ID must equal the WebAuthn origin hostname or a parent domain of it.")
 
 
 def allowed_origins() -> list[str]:
