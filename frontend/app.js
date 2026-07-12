@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.12.1';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.12.1';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.12.1';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.12.1';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.12.1';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.12.5';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.12.5';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.12.5';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.12.5';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.12.5';
 
 let serviceFilter = "all";
 let logFilter = "all";

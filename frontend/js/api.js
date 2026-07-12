@@ -122,23 +122,45 @@ function connectionLabel(baseUrl) {
 }
 
 export function createApi({ addAudit, getState, setConnectionState, settings }) {
+  async function authenticatedFetch(url, currentSettings, fetchOptions = {}, authMode = "session") {
+    const send = async (authToken) => fetch(url, {
+      ...fetchOptions,
+      credentials: "include",
+      headers: {
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        ...(fetchOptions.headers || {})
+      }
+    });
+
+    const authToken = await authTokenFor(currentSettings, authMode);
+    let response = await send(authToken);
+    if (response.status !== 401 || authMode !== "session") return response;
+
+    clearBrowserSession();
+    const refreshedSession = await createBrowserSession(currentSettings);
+    if (!refreshedSession?.token) return response;
+    response = await send(refreshedSession.token);
+    return response;
+  }
+
   async function request(path, options = {}) {
     const currentSettings = effectiveSettings(settings);
     if (!currentSettings.baseUrl) {
       throw new Error("Backend is not configured");
     }
     const { authMode = "session", ...fetchOptions } = options;
-    const authToken = await authTokenFor(currentSettings, authMode);
-
-    const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}${path}`, {
-      ...fetchOptions,
-      credentials: "include",
-      headers: {
-        ...(fetchOptions.body ? { "Content-Type": "application/json" } : {}),
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        ...(fetchOptions.headers || {})
-      }
-    });
+    const response = await authenticatedFetch(
+      `${currentSettings.baseUrl.replace(/\/$/, "")}${path}`,
+      currentSettings,
+      {
+        ...fetchOptions,
+        headers: {
+          ...(fetchOptions.body ? { "Content-Type": "application/json" } : {}),
+          ...(fetchOptions.headers || {})
+        }
+      },
+      authMode
+    );
     if (!response.ok) {
       let detail = `Request failed with ${response.status}`;
       try {
@@ -162,10 +184,10 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
     }
 
     try {
-      const authToken = await authTokenFor(currentSettings);
-      const response = await fetch(`${currentSettings.baseUrl.replace(/\/$/, "")}/api/mobile/state`, {
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
-      });
+      const response = await authenticatedFetch(
+        `${currentSettings.baseUrl.replace(/\/$/, "")}/api/mobile/state`,
+        currentSettings
+      );
       if (!response.ok) throw new Error(`Backend returned ${response.status}`);
       const data = await response.json();
       setConnectionState({
