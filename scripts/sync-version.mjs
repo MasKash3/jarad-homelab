@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -93,6 +94,47 @@ function updateContent(filePath, content, version) {
   return content.replace(VERSION_ANYWHERE_PATTERN, version);
 }
 
+function sha384Integrity(filePath) {
+  const content = readFileSync(filePath);
+  return `sha384-${createHash("sha384").update(content).digest("base64")}`;
+}
+
+function syncEntryIntegrity(check) {
+  const indexPath = path.join(rootDir, "frontend", "index.html");
+  const assets = [
+    {
+      path: path.join(rootDir, "frontend", "styles.css"),
+      pattern: /(href="styles\.css\?v=[^"]+"\s+integrity=")[^"]+(")/
+    },
+    {
+      path: path.join(rootDir, "frontend", "js", "error-handler.js"),
+      pattern: /(src="js\/error-handler\.js\?v=[^"]+"\s+integrity=")[^"]+(")/
+    },
+    {
+      path: path.join(rootDir, "frontend", "app.js"),
+      pattern: /(src="app\.js\?v=[^"]+"[^>]*\sintegrity=")[^"]+(")/
+    }
+  ];
+  const current = readFileSync(indexPath, "utf8");
+  let next = current;
+
+  for (const asset of assets) {
+    if (!asset.pattern.test(next)) {
+      throw new Error(`Missing integrity attribute for ${path.relative(rootDir, asset.path)}`);
+    }
+    const integrity = sha384Integrity(asset.path);
+    next = next.replace(asset.pattern, `$1${integrity}$2`);
+  }
+
+  if (check && next !== current) {
+    throw new Error("Frontend entry integrity hashes are stale.");
+  }
+  if (!check && next !== current) {
+    writeFileSync(indexPath, next);
+  }
+  return next !== current;
+}
+
 function printHelp() {
   console.log(`Usage:
   node scripts/sync-version.mjs              Sync frontend files from frontend/version.json
@@ -126,6 +168,11 @@ function main() {
         writeFileSync(filePath, nextContent);
       }
     }
+  }
+
+  const integrityChanged = syncEntryIntegrity(options.check);
+  if (integrityChanged && !changed.includes("frontend/index.html")) {
+    changed.push("frontend/index.html");
   }
 
   if (options.check && changed.length > 0) {

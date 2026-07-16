@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,5 +77,17 @@ assert.match(csp, /object-src 'none'/, "CSP must disable plugins");
 assert.match(csp, /base-uri 'none'/, "CSP must block base URL injection");
 assert.match(csp, /frame-ancestors 'none'/, "CSP must block framing");
 assert.doesNotMatch(csp, /'unsafe-inline'|'unsafe-eval'/, "CSP must not allow inline or evaluated scripts");
+
+const indexSource = readFileSync(path.join(frontendDir, "index.html"), "utf8");
+for (const [assetPath, pattern] of [
+  ["styles.css", /href="styles\.css\?v=[^"]+"\s+integrity="([^"]+)"/],
+  ["js/error-handler.js", /src="js\/error-handler\.js\?v=[^"]+"\s+integrity="([^"]+)"/],
+  ["app.js", /src="app\.js\?v=[^"]+"[^>]*\sintegrity="([^"]+)"/]
+]) {
+  const declared = indexSource.match(pattern)?.[1];
+  assert.ok(declared, `Missing Subresource Integrity for ${assetPath}`);
+  const expected = `sha384-${createHash("sha384").update(readFileSync(path.join(frontendDir, assetPath))).digest("base64")}`;
+  assert.equal(declared, expected, `Stale Subresource Integrity for ${assetPath}`);
+}
 
 console.log(`Frontend security check passed (${htmlSinkCount} reviewed HTML sinks).`);
