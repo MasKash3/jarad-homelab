@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .command import run_command
-from .config import BACKUP_LOG, DATA_MOUNT, DNS_SERVER, PUBLIC_HOST, SERVICES
+from .config import BACKUP_LOG, DATA_MOUNT, DNS_SERVER, PUBLIC_HOST, REDUCED_SERVICE_METADATA, SERVICES
 from .docker import docker_ps, docker_restarts, docker_started_at, docker_stats
 from .logtail import tail_lines
 from .redaction import redact_sensitive_text
@@ -46,23 +46,41 @@ def build_services() -> list[dict[str, Any]]:
             "diskLimit": None,
         }
 
-        services.append(
-            {
-                "id": service_id,
-                **meta,
-                "status": "unknown" if docker_unavailable else "running" if running else "stopped",
-                "health": health,
-                "uptime": service_uptime(docker_info["status"] if docker_info else None, started_at, running, docker_unavailable),
-                "restarts": docker_restarts(container) if docker_info else 0,
-                "cpu": round(float(stat.get("cpu", 0))),
-                "ram": memory,
-                "lastError": last_error,
-                "diagnostics": diagnostics_for(service_id, running, health, docker_unavailable),
-                "resources": resources,
-            }
-        )
+        service_record = {
+            "id": service_id,
+            **meta,
+            "status": "unknown" if docker_unavailable else "running" if running else "stopped",
+            "health": health,
+            "uptime": service_uptime(
+                docker_info["status"] if docker_info else None,
+                started_at,
+                running,
+                docker_unavailable,
+            ),
+            "restarts": docker_restarts(container) if docker_info else 0,
+            "cpu": round(float(stat.get("cpu", 0))),
+            "ram": memory,
+            "lastError": last_error,
+            "diagnostics": diagnostics_for(service_id, running, health, docker_unavailable),
+            "resources": resources,
+        }
+        services.append(public_service_metadata(service_record))
 
     return services
+
+
+def public_service_metadata(service: dict[str, Any]) -> dict[str, Any]:
+    if not REDUCED_SERVICE_METADATA:
+        return service
+    public_service = dict(service)
+    public_service["container"] = "Managed service"
+    public_service["image"] = "Image details hidden"
+    public_service["lastError"] = (
+        "Service needs attention"
+        if service.get("health") in {"down", "degraded"}
+        else "No reported issues"
+    )
+    return public_service
 
 
 def service_uptime(status: str | None, started_at: str | None, running: bool, docker_unavailable: bool) -> str:
@@ -175,7 +193,7 @@ def network_state() -> list[list[str]]:
         ["DNS", "OK" if dns_ok() else "Degraded"],
         ["Gateway", "Unchecked"],
         ["Private network", "Configured" if PUBLIC_HOST else "Unknown"],
-        ["Host", socket.gethostname()],
+        ["Host", "Private host" if REDUCED_SERVICE_METADATA else socket.gethostname()],
     ]
 
 

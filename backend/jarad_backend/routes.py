@@ -10,7 +10,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from .audit import audit_event
 from .auth import DEVICE_COOKIE_NAME, require_device_token, require_token, verify_action_auth, verify_totp_for_actor
-from .config import ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP, DEVICE_TOKEN_TTL_DAYS, LAN_IP, PUBLIC_HOST, SERVICES, TOTP_SECRET
+from .config import (
+    ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP,
+    DEVICE_TOKEN_TTL_DAYS,
+    LAN_IP,
+    PUBLIC_HOST,
+    REDUCED_SERVICE_METADATA,
+    SERVICES,
+    TOTP_SECRET,
+)
 from .device_tokens import create_browser_session, create_device_token, list_device_tokens, revoke_device_token, rotate_device_token
 from .dns_access import approve_client, deny_client, list_clients as list_dns_clients, revoke_client, update_client_label
 from .docker import docker_action, docker_logs, is_allowed_action
@@ -394,12 +402,12 @@ def mobile_state() -> dict[str, Any]:
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "server": {
             "name": "Jarad",
-            "host": PUBLIC_HOST,
-            "lan": LAN_IP,
+            "host": "Private host" if REDUCED_SERVICE_METADATA else PUBLIC_HOST,
+            "lan": "Private network" if REDUCED_SERVICE_METADATA else LAN_IP,
             "uptime": read_uptime(),
             "healthScore": score,
             "status": status,
-            "platform": platform.platform(),
+            "platform": "Private Linux host" if REDUCED_SERVICE_METADATA else platform.platform(),
         },
         "metrics": metrics,
         "storage": {
@@ -583,7 +591,7 @@ def service_logs(service_id: str, payload: ActionRequest, request: Request, limi
                 {
                     "level": "error",
                     "time": "Recent",
-                    "message": combined.strip() or f"docker logs failed for {service['container']}",
+                    "message": combined.strip() or "Docker logs failed for the managed service",
                 }
             ],
         }
@@ -705,7 +713,7 @@ def service_action(action_id: str, payload: ActionRequest, request: Request) -> 
         "status": "accepted",
         "action": action,
         "service": service_id,
-        "target": service["container"],
+        "target": service_id if REDUCED_SERVICE_METADATA else service["container"],
         "source": payload.source,
         "current": refreshed,
     }
