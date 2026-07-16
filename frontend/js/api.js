@@ -247,6 +247,14 @@ export function createApi({ addAudit, getState, setConnectionState, settings }) 
       body: JSON.stringify({ totpCode })
     });
   },
+  async lockCurrentDevice() {
+    const result = await request("/api/auth/devices/current/lock", {
+      method: "POST",
+      authMode: "cookie"
+    });
+    clearBrowserSession();
+    return result;
+  },
   async deletePasskey(credentialId, totpCode) {
     return request(`/api/auth/webauthn/credentials/${encodeURIComponent(credentialId)}`, {
       method: "DELETE",

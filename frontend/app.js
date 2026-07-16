@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.1';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.16.1';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.1';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.1';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.16.1';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.2';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.16.2';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.2';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.2';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.16.2';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -993,6 +993,25 @@ async function revokeDeviceToken(deviceId) {
   }
 }
 
+async function lockCurrentDevice() {
+  const confirmation = window.prompt(
+    "Lock this phone and revoke its Jarad access? Type LOCK to continue."
+  );
+  if (confirmation !== "LOCK") return;
+
+  try {
+    await api.lockCurrentDevice();
+    clearStoredDeviceToken();
+    addAudit("Locked current device", "config", "success", "Persistent access revoked");
+    window.location.reload();
+  } catch (error) {
+    deviceTokenMessage = error.message;
+    deviceTokenMessageState = "bad";
+    addAudit("Device lock failed", "config", "failure", error.message);
+    renderConfig();
+  }
+}
+
 async function registerThisDevicePasskey() {
   const button = $("#registerPasskeyButton");
   const originalText = button.textContent;
@@ -1158,6 +1177,7 @@ function bindEvents() {
   });
   $("#registerPasskeyButton")?.addEventListener("click", registerThisDevicePasskey);
   $("#registerDeviceTokenButton")?.addEventListener("click", registerThisDeviceToken);
+  $("#lockCurrentDeviceButton")?.addEventListener("click", lockCurrentDevice);
   $("#resetLocalAppButton")?.addEventListener("click", () => {
     resetLocalAppData().catch((error) => {
       addAudit("PWA recovery failed", "local app", "failure", error.message);

@@ -95,6 +95,16 @@ def set_device_cookie(response: Response, token: str) -> None:
     )
 
 
+def clear_device_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=DEVICE_COOKIE_NAME,
+        path="/api/auth",
+        secure=True,
+        httponly=True,
+        samesite="strict",
+    )
+
+
 @router.post("/api/auth/session")
 def auth_session_create(
     request: Request,
@@ -139,6 +149,28 @@ def auth_device_register(payload: DeviceTokenRegisterRequest, request: Request, 
         details={"device_id": result["device"]["deviceId"], "device_label": result["device"]["deviceLabel"]},
     )
     return {"device": result["device"]}
+
+
+@router.post("/api/auth/devices/current/lock")
+def auth_device_lock(
+    request: Request,
+    response: Response,
+    device: dict[str, Any] = Depends(require_device_token),
+) -> dict[str, str]:
+    enforce_rate_limit(request, bucket="device-lock", limit=5, window_seconds=300)
+    device_id = device["device_id"]
+    if not revoke_device_token(device_id):
+        audit_event(
+            "device_token.lock",
+            "failure",
+            request=request,
+            details={"device_id": device_id, "detail": "Unknown or already revoked device token"},
+        )
+        clear_device_cookie(response)
+        raise HTTPException(status_code=404, detail="Unknown or already revoked device token")
+    clear_device_cookie(response)
+    audit_event("device_token.lock", "success", request=request, details={"device_id": device_id})
+    return {"status": "locked"}
 
 
 @router.delete("/api/auth/devices/{device_id}", dependencies=protected)
