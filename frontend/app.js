@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.2';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.16.2';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.2';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.2';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.16.2';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.3';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.16.3';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.3';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.3';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.16.3';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -365,7 +365,13 @@ function renderConfig() {
     <article class="config-card">
       <div>
         <strong>${escapeHtml(credential.deviceLabel || "Registered passkey")}</strong>
-        <p>${escapeHtml(credential.lastUsedAt ? `Last used ${formatUpdated(credential.lastUsedAt)}` : `Created ${formatUpdated(credential.createdAt)}`)}</p>
+        <p>${escapeHtml(
+          credential.lastUsedAt
+            ? `Last used ${formatUpdated(credential.lastUsedAt)}`
+            : credential.createdAt
+            ? `Created ${formatUpdated(credential.createdAt)}`
+            : "Usage metadata hidden"
+        )}</p>
       </div>
       <button class="text-button" type="button" data-delete-passkey="${escapeAttr(credential.credentialId)}">Remove</button>
     </article>
@@ -378,7 +384,13 @@ function renderConfig() {
       && expiresAtMs <= Date.now() + DEVICE_RENEWAL_WARNING_DAYS * 24 * 60 * 60 * 1000;
     const deviceStatus = device.revokedAt
       ? `Revoked ${formatUpdated(device.revokedAt)}`
-      : `${device.lastUsedAt ? `Last used ${formatUpdated(device.lastUsedAt)}` : `Created ${formatUpdated(device.createdAt)}`}${device.expiresAt ? `; expires ${formatFuture(device.expiresAt)}` : ""}`;
+      : `${
+          device.lastUsedAt
+            ? `Last used ${formatUpdated(device.lastUsedAt)}`
+            : device.createdAt
+            ? `Created ${formatUpdated(device.createdAt)}`
+            : "Usage metadata hidden"
+        }${device.expiresAt ? `; expires ${formatFuture(device.expiresAt)}` : ""}`;
     return `
     <article class="config-card device-token-card ${device.revokedAt ? "is-muted" : ""}">
       <div>

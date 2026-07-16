@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import Request
 
 from .auth import hash_access_token
+from .config import REDUCED_CREDENTIAL_METADATA
 from .request_address import client_addr
 from .webauthn_store import WebAuthnStore
 
@@ -64,14 +65,30 @@ def create_browser_session(device_id: str, request: Request) -> dict[str, Any]:
 
 
 def list_device_tokens() -> list[dict[str, Any]]:
-    return [public_device(device) for device in store.list_device_tokens(include_revoked=False)]
+    devices = store.list_device_tokens(include_revoked=False)
+    return [
+        public_device(device, alias=f"Device {index}")
+        for index, device in enumerate(devices, start=1)
+    ]
 
 
 def revoke_device_token(device_id: str) -> bool:
     return store.revoke_device_token(device_id)
 
 
-def public_device(device: dict[str, Any]) -> dict[str, Any]:
+def public_device(device: dict[str, Any], alias: str | None = None) -> dict[str, Any]:
+    if REDUCED_CREDENTIAL_METADATA:
+        return {
+            "deviceId": device["device_id"],
+            "deviceLabel": alias or "Registered device",
+            "createdAt": None,
+            "lastUsedAt": None,
+            "revokedAt": device["revoked_at"],
+            "expiresAt": device["expires_at"],
+            "rotatedAt": None,
+            "remoteAddr": None,
+            "userAgent": None,
+        }
     return {
         "deviceId": device["device_id"],
         "deviceLabel": device["device_label"],

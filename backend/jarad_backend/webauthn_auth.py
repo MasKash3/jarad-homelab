@@ -20,7 +20,7 @@ from webauthn.helpers.structs import (
     UserVerificationRequirement,
 )
 
-from .config import WEBAUTHN_ORIGIN, WEBAUTHN_RP_ID
+from .config import REDUCED_CREDENTIAL_METADATA, WEBAUTHN_ORIGIN, WEBAUTHN_RP_ID
 from .webauthn_store import ACTION_AUTH_TTL_SECONDS, CHALLENGE_TTL_SECONDS, WebAuthnStore
 
 
@@ -185,15 +185,16 @@ def finish_authentication(
 
 
 def list_registered_credentials() -> list[dict[str, Any]]:
+    credentials = store.list_credentials()
     return [
         {
             "credentialId": item["credential_id"],
-            "deviceLabel": item["device_label"],
-            "createdAt": item["created_at"],
-            "lastUsedAt": item["last_used_at"],
+            "deviceLabel": f"Passkey {index}" if REDUCED_CREDENTIAL_METADATA else item["device_label"],
+            "createdAt": None if REDUCED_CREDENTIAL_METADATA else item["created_at"],
+            "lastUsedAt": None if REDUCED_CREDENTIAL_METADATA else item["last_used_at"],
             "enabled": bool(item["enabled"]),
         }
-        for item in store.list_credentials()
+        for index, item in enumerate(credentials, start=1)
     ]
 
 
