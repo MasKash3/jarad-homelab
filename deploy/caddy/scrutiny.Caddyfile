@@ -1,9 +1,6 @@
 # scrutiny:start
-__TAILSCALE_DOMAIN__:__EXTERNAL_PORT__ {
-    tls /certs/__TAILSCALE_DOMAIN__.crt /certs/__TAILSCALE_DOMAIN__.key
-
-    @outsideTailnet not remote_ip 100.64.0.0/10 fd7a:115c:a1e0::/48
-    respond @outsideTailnet 403
+__SCRUTINY_DOMAIN__ {
+    import cloudflare_dns
 
     header {
         Referrer-Policy "no-referrer"

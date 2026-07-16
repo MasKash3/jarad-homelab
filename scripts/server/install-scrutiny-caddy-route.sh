@@ -2,24 +2,23 @@
 set -euo pipefail
 
 REMOTE_ROOT="${1:-$HOME/mobile}"
-TAILSCALE_DOMAIN="${2:-}"
-EXTERNAL_PORT="${3:-8445}"
-UPSTREAM_PORT="${4:-8080}"
-CADDYFILE="${5:-$HOME/caddy/Caddyfile}"
+SCRUTINY_DOMAIN="${2:-}"
+UPSTREAM_PORT="${3:-8080}"
+CADDYFILE="${4:-$HOME/caddy/Caddyfile}"
 TEMPLATE="$REMOTE_ROOT/deploy/caddy/scrutiny.Caddyfile"
 
-if [[ -z "$TAILSCALE_DOMAIN" ]]; then
-  echo "Usage: install-scrutiny-caddy-route.sh <remote-root> <tailscale-domain> [external-port] [upstream-port] [caddyfile]" >&2
+if [[ -z "$SCRUTINY_DOMAIN" ]]; then
+  echo "Usage: install-scrutiny-caddy-route.sh <remote-root> <scrutiny-domain> [upstream-port] [caddyfile]" >&2
   exit 1
 fi
 
-if (( ${#TAILSCALE_DOMAIN} > 253 )) \
-  || [[ ! "$TAILSCALE_DOMAIN" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] \
-  || [[ "$TAILSCALE_DOMAIN" != *.* || "$TAILSCALE_DOMAIN" == *..* || "$TAILSCALE_DOMAIN" == *"*"* ]]; then
+if (( ${#SCRUTINY_DOMAIN} > 253 )) \
+  || [[ ! "$SCRUTINY_DOMAIN" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] \
+  || [[ "$SCRUTINY_DOMAIN" != *.* || "$SCRUTINY_DOMAIN" == *..* || "$SCRUTINY_DOMAIN" == *"*"* ]]; then
   echo "Caddy domain must be one exact DNS hostname without a wildcard." >&2
   exit 1
 fi
-IFS='.' read -r -a domain_labels <<<"$TAILSCALE_DOMAIN"
+IFS='.' read -r -a domain_labels <<<"$SCRUTINY_DOMAIN"
 for label in "${domain_labels[@]}"; do
   if (( ${#label} > 63 )) || [[ ! "$label" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; then
     echo "Caddy domain contains an invalid DNS label." >&2
@@ -27,12 +26,10 @@ for label in "${domain_labels[@]}"; do
   fi
 done
 
-for port in "$EXTERNAL_PORT" "$UPSTREAM_PORT"; do
-  if [[ ! "$port" =~ ^[0-9]+$ ]] || (( port < 1 || port > 65535 )); then
-    echo "Caddy ports must be integers from 1 to 65535." >&2
-    exit 1
-  fi
-done
+if [[ ! "$UPSTREAM_PORT" =~ ^[0-9]+$ ]] || (( UPSTREAM_PORT < 1 || UPSTREAM_PORT > 65535 )); then
+  echo "Caddy upstream port must be an integer from 1 to 65535." >&2
+  exit 1
+fi
 
 [[ -f "$TEMPLATE" ]] || {
   echo "Missing Caddy template: $TEMPLATE" >&2
@@ -49,8 +46,7 @@ tmp_new="$(mktemp)"
 trap 'rm -f "$tmp_rendered" "$tmp_clean" "$tmp_new"' EXIT
 
 sed \
-  -e "s#__TAILSCALE_DOMAIN__#$TAILSCALE_DOMAIN#g" \
-  -e "s#__EXTERNAL_PORT__#$EXTERNAL_PORT#g" \
+  -e "s#__SCRUTINY_DOMAIN__#$SCRUTINY_DOMAIN#g" \
   -e "s#__UPSTREAM_PORT__#$UPSTREAM_PORT#g" \
   "$TEMPLATE" > "$tmp_rendered"
 
@@ -77,4 +73,4 @@ if ! docker restart caddy; then
   exit 1
 fi
 
-echo "Installed private Scrutiny route: https://$TAILSCALE_DOMAIN:$EXTERNAL_PORT"
+echo "Installed private Scrutiny route: https://$SCRUTINY_DOMAIN"
