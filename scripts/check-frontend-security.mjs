@@ -77,6 +77,8 @@ assert.match(csp, /object-src 'none'/, "CSP must disable plugins");
 assert.match(csp, /base-uri 'none'/, "CSP must block base URL injection");
 assert.match(csp, /frame-ancestors 'none'/, "CSP must block framing");
 assert.doesNotMatch(csp, /'unsafe-inline'|'unsafe-eval'/, "CSP must not allow inline or evaluated scripts");
+assert.match(caddyfile, /not remote_ip 100\.64\.0\.0\/10 fd7a:115c:a1e0::\/48/, "Caddy must reject non-tailnet source ranges");
+assert.match(caddyfile, /respond @outsideTailnet 403/, "Caddy must fail closed for non-tailnet clients");
 
 const indexSource = readFileSync(path.join(frontendDir, "index.html"), "utf8");
 for (const [assetPath, pattern] of [

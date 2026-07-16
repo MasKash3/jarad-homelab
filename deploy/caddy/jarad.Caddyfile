@@ -2,6 +2,9 @@
 __TAILSCALE_DOMAIN__:__APP_PORT__ {
     tls /certs/__TAILSCALE_DOMAIN__.crt /certs/__TAILSCALE_DOMAIN__.key
 
+    @outsideTailnet not remote_ip 100.64.0.0/10 fd7a:115c:a1e0::/48
+    respond @outsideTailnet 403
+
     header {
         Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
         Referrer-Policy "no-referrer"
