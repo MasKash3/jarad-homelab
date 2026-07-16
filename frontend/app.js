@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.5';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.16.5';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.5';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.5';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.16.5';
+import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.7';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.16.7';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.7';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.7';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.16.7';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -401,7 +401,9 @@ function renderConfig() {
         <div class="device-token-actions">
           ${renewalWarning ? `<span class="pill warn">Renew soon</span>` : ""}
           ${device.isCurrent ? `<button class="text-button" type="button" data-rotate-device>Rotate</button>` : ""}
-          <button class="text-button" type="button" data-revoke-device="${escapeAttr(device.deviceId)}">Revoke</button>
+          ${device.isCurrent
+            ? `<button class="text-button" type="button" data-lock-current-device>Sign out &amp; revoke</button>`
+            : `<button class="text-button" type="button" data-revoke-device="${escapeAttr(device.deviceId)}">Revoke</button>`}
         </div>
       `}
     </article>
@@ -410,17 +412,6 @@ function renderConfig() {
   $("#deviceTokenHelp").textContent = deviceTokenMessage;
   $("#deviceTokenHelp").hidden = !deviceTokenMessage;
   $("#deviceTokenHelp").className = `config-help ${deviceTokenMessageState}`;
-  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
-  $("#configList").innerHTML = configActions.map((item) => `
-    <article class="config-card">
-      <div>
-        <strong>${escapeHtml(item.title)}</strong>
-        <p>${escapeHtml(item.detail)}</p>
-      </div>
-      <span class="pill info">${escapeHtml(item.target)}</span>
-    </article>
-  `).join("");
-
   $$("[data-auth-method]").forEach((button) => {
     button.classList.toggle("is-selected", button.dataset.authMethod === getAuthMethod());
   });
@@ -432,6 +423,9 @@ function renderConfig() {
   });
   $$("[data-rotate-device]").forEach((button) => {
     button.addEventListener("click", rotateCurrentDeviceToken);
+  });
+  $$("[data-lock-current-device]").forEach((button) => {
+    button.addEventListener("click", lockCurrentDevice);
   });
   renderAudit();
 }
@@ -1032,14 +1026,14 @@ async function revokeDeviceToken(deviceId) {
 
 async function lockCurrentDevice() {
   const confirmation = window.prompt(
-    "Lock this phone and revoke its Jarad access? Type LOCK to continue."
+    "Sign out and permanently revoke Jarad access for this device? Type REVOKE to continue."
   );
-  if (confirmation !== "LOCK") return;
+  if (confirmation !== "REVOKE") return;
 
   try {
     await api.lockCurrentDevice();
     clearStoredDeviceToken();
-    addAudit("Locked current device", "config", "success", "Persistent access revoked");
+    addAudit("Signed out and revoked device", "config", "success", "Persistent access revoked");
     window.location.reload();
   } catch (error) {
     deviceTokenMessage = error.message;
@@ -1214,7 +1208,6 @@ function bindEvents() {
   });
   $("#registerPasskeyButton")?.addEventListener("click", registerThisDevicePasskey);
   $("#registerDeviceTokenButton")?.addEventListener("click", registerThisDeviceToken);
-  $("#lockCurrentDeviceButton")?.addEventListener("click", lockCurrentDevice);
   $("#resetLocalAppButton")?.addEventListener("click", () => {
     resetLocalAppData().catch((error) => {
       addAudit("PWA recovery failed", "local app", "failure", error.message);

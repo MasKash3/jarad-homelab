@@ -35,17 +35,29 @@ function assertWebAuthnAvailable() {
 export function defaultDeviceLabel() {
   const userAgent = navigator.userAgent || "";
   const platform = navigator.userAgentData?.platform || navigator.platform || "";
-  const normalized = normalizeDevicePlatform(platform, userAgent);
+  const normalized = normalizeDevicePlatform(
+    platform,
+    userAgent,
+    navigator.userAgentData?.mobile,
+    navigator.maxTouchPoints || 0
+  );
   return `${normalized} passkey`;
 }
 
-function normalizeDevicePlatform(platform, userAgent) {
+export function normalizeDevicePlatform(platform, userAgent, mobile = null, maxTouchPoints = 0) {
   const value = `${platform} ${userAgent}`.toLowerCase();
-  if (value.includes("android")) {
-    return "Android";
+  if (value.includes("ipad") || (value.includes("mac") && maxTouchPoints > 1)) {
+    return "iPad";
   }
-  if (value.includes("iphone") || value.includes("ipad") || value.includes("ios")) {
-    return "iOS";
+  if (value.includes("iphone")) {
+    return "iPhone";
+  }
+  if (value.includes("android")) {
+    const isPhone = mobile ?? value.includes("mobile");
+    return isPhone ? "Android phone" : "Android tablet";
+  }
+  if (value.includes("ios")) {
+    return "iOS device";
   }
   if (value.includes("mac")) {
     return "Mac";

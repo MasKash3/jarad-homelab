@@ -1,15 +1,15 @@
-const CACHE_NAME = "jarad-2026.07.16.5";
+const CACHE_NAME = "jarad-2026.07.16.7";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=2026.07.16.5",
-  "./js/error-handler.js?v=2026.07.16.5",
-  "./js/api.js?v=2026.07.16.5",
-  "./js/auth.js?v=2026.07.16.5",
-  "./js/config.js?v=2026.07.16.5",
-  "./js/empty-state.js?v=2026.07.16.5",
-  "./js/utils.js?v=2026.07.16.5",
-  "./app.js?v=2026.07.16.5",
+  "./styles.css?v=2026.07.16.7",
+  "./js/error-handler.js?v=2026.07.16.7",
+  "./js/api.js?v=2026.07.16.7",
+  "./js/auth.js?v=2026.07.16.7",
+  "./js/config.js?v=2026.07.16.7",
+  "./js/empty-state.js?v=2026.07.16.7",
+  "./js/utils.js?v=2026.07.16.7",
+  "./app.js?v=2026.07.16.7",
   "./manifest.webmanifest",
   "./icons/icon-192.svg",
   "./icons/icon-512.svg"

@@ -1,4 +1,4 @@
-export const APP_VERSION = "2026.07.16.5";
+export const APP_VERSION = "2026.07.16.7";
 
 export const storageKeys = {
   audit: "jarad.audit",
@@ -20,11 +20,4 @@ export const serviceActions = [
   { kind: "start", title: "Start", detail: "Protected Docker start", icon: "icon-power", protected: true },
   { kind: "restart", title: "Restart", detail: "Protected Docker restart", icon: "icon-refresh", protected: true },
   { kind: "stop", title: "Stop", detail: "Protected stop action", icon: "icon-power", protected: true, danger: true }
-];
-
-export const configActions = [
-  { title: "Backend", detail: "FastAPI URL and bootstrap token", target: "Private API" },
-  { title: "Devices", detail: "Revocable per-device access tokens", target: "Backend" },
-  { title: "Authentication", detail: "Choose fingerprint or TOTP for protected actions", target: "Local device" },
-  { title: "Audit", detail: "Recent app and action records", target: "Local log" }
 ];

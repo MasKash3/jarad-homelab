@@ -9,9 +9,16 @@ import { fileURLToPath } from "node:url";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const frontendDir = path.join(rootDir, "frontend");
 const reviewMarker = "xss-reviewed: dynamic template values use escaping or whitelist helpers.";
-const expectedHtmlSinks = 13;
+const expectedHtmlSinks = 12;
 const utilsSource = readFileSync(path.join(frontendDir, "js", "utils.js"), "utf8");
 const { escapeAttr, escapeHtml } = await import(`data:text/javascript;base64,${Buffer.from(utilsSource).toString("base64")}`);
+const authSource = readFileSync(path.join(frontendDir, "js", "auth.js"), "utf8");
+const { normalizeDevicePlatform } = await import(`data:text/javascript;base64,${Buffer.from(authSource).toString("base64")}`);
+
+assert.equal(normalizeDevicePlatform("iPhone", "iPhone"), "iPhone");
+assert.equal(normalizeDevicePlatform("MacIntel", "Macintosh", null, 5), "iPad");
+assert.equal(normalizeDevicePlatform("Linux arm", "Android Mobile", true), "Android phone");
+assert.equal(normalizeDevicePlatform("Linux arm", "Android", false), "Android tablet");
 
 const maliciousValues = [
   `<script>alert("xss")</script>`,
