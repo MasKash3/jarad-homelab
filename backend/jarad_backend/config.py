@@ -93,7 +93,7 @@ REDUCED_SERVICE_METADATA = env(
 ).strip().lower() not in {"0", "false", "no"}
 REDUCED_CREDENTIAL_METADATA = env(
     "JARAD_REDUCED_CREDENTIAL_METADATA",
-    "1",
+    "0",
     "HOMELAB_REDUCED_CREDENTIAL_METADATA",
 ).strip().lower() not in {"0", "false", "no"}
 PUBLIC_HOST = env("JARAD_PUBLIC_HOST", "home.example", "HOMELAB_PUBLIC_HOST")
