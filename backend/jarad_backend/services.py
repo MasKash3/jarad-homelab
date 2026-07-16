@@ -134,6 +134,14 @@ def diagnostics_for(service_id: str, running: bool, health: str, docker_unavaila
     ]
     if service_id == "pihole":
         checks.insert(2, ["DNS test", "Pass" if dns_ok() else "Failed"])
+    if service_id == "scrutiny":
+        checks.insert(
+            2,
+            [
+                "Drive SMART health",
+                "Unchecked here; open Scrutiny for disk-specific health and history",
+            ],
+        )
     return checks
 
 

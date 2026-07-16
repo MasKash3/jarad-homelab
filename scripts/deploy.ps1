@@ -120,6 +120,14 @@ if (-not $FrontendOnly) {
     "${remote}:$RemoteRoot/scripts/server/install-caddy-route.sh"
   )
   Invoke-Checked "scp" @(
+    (Join-Path $serverScriptsPath "install-scrutiny.sh"),
+    "${remote}:$RemoteRoot/scripts/server/install-scrutiny.sh"
+  )
+  Invoke-Checked "scp" @(
+    (Join-Path $serverScriptsPath "install-scrutiny-caddy-route.sh"),
+    "${remote}:$RemoteRoot/scripts/server/install-scrutiny-caddy-route.sh"
+  )
+  Invoke-Checked "scp" @(
     (Join-Path $serverScriptsPath "jarad-dns-access"),
     "${remote}:$RemoteRoot/scripts/server/jarad-dns-access"
   )
@@ -134,9 +142,10 @@ if (-not $FrontendOnly) {
   )
   Invoke-Checked "scp" @(
     (Join-Path $caddyPath "jarad.Caddyfile"),
-    "${remote}:$RemoteRoot/deploy/caddy/jarad.Caddyfile"
+    (Join-Path $caddyPath "scrutiny.Caddyfile"),
+    "${remote}:$RemoteRoot/deploy/caddy/"
   )
-  Invoke-Checked "ssh" @($remote, "chmod +x $RemoteRoot/scripts/server/restart-backend.sh $RemoteRoot/scripts/server/install-systemd.sh $RemoteRoot/scripts/server/install-caddy-route.sh $RemoteRoot/scripts/server/jarad-dns-access $RemoteRoot/scripts/server/jarad-docker")
+  Invoke-Checked "ssh" @($remote, "chmod +x $RemoteRoot/scripts/server/restart-backend.sh $RemoteRoot/scripts/server/install-systemd.sh $RemoteRoot/scripts/server/install-caddy-route.sh $RemoteRoot/scripts/server/install-scrutiny.sh $RemoteRoot/scripts/server/install-scrutiny-caddy-route.sh $RemoteRoot/scripts/server/jarad-dns-access $RemoteRoot/scripts/server/jarad-docker")
 }
 
 if ($InstallCaddy -and $FrontendOnly) {

@@ -1,8 +1,8 @@
-import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.7';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.16.7';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.7';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.7';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.16.7';
+import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.8';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.16.8';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.8';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.8';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, serviceHealthLabel, stateClass, toneClass } from './js/utils.js?v=2026.07.16.8';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -208,7 +208,7 @@ function renderServices() {
         <h3>${escapeHtml(service.name)}</h3>
         <p>${escapeHtml(service.container)}</p>
       </div>
-      <span class="pill ${escapeAttr(stateClass(service))}">${escapeHtml(formatHealth(service.health))}</span>
+      <span class="pill ${escapeAttr(stateClass(service))}">${escapeHtml(serviceHealthLabel(service))}</span>
       <svg class="row-chevron"><use href="#icon-link"></use></svg>
     </button>
   `).join("") || emptyState(state.isEmpty ? "No live services loaded. Connect to the backend to view containers." : "No services match this filter.");
@@ -482,7 +482,7 @@ function openService(serviceId, options = {}) {
         <h3>${escapeHtml(service.name)}</h3>
         <p>${escapeHtml(service.image)}</p>
       </div>
-      <span class="pill ${escapeAttr(stateClass(service))}">${escapeHtml(formatHealth(service.health))}</span>
+      <span class="pill ${escapeAttr(stateClass(service))}">${escapeHtml(serviceHealthLabel(service))}</span>
     </div>
     <div class="detail-grid">
       <div><span>Status</span><strong>${escapeHtml(service.status)}</strong></div>

@@ -85,6 +85,13 @@ export function formatHealth(health) {
   }[health] || String(health);
 }
 
+export function serviceHealthLabel(service) {
+  if (service.health === "healthy" && service.healthy_label) {
+    return String(service.healthy_label);
+  }
+  return formatHealth(service.health);
+}
+
 export function labelForState(stateName) {
   return stateName === "good" ? "OK" : stateName === "warn" ? "Monitor" : "High";
 }
@@ -103,7 +110,8 @@ export function serviceColorClass(serviceId) {
     "pihole",
     "dozzle",
     "uptime-kuma",
-    "stirling-pdf"
+    "stirling-pdf",
+    "scrutiny"
   ].includes(id) ? `app-color-${id}` : "app-color-default";
 }
 

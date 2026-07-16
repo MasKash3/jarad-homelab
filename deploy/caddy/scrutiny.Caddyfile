@@ -1,0 +1,16 @@
+# scrutiny:start
+__TAILSCALE_DOMAIN__:__EXTERNAL_PORT__ {
+    tls /certs/__TAILSCALE_DOMAIN__.crt /certs/__TAILSCALE_DOMAIN__.key
+
+    @outsideTailnet not remote_ip 100.64.0.0/10 fd7a:115c:a1e0::/48
+    respond @outsideTailnet 403
+
+    header {
+        Referrer-Policy "no-referrer"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+    }
+
+    reverse_proxy localhost:__UPSTREAM_PORT__
+}
+# scrutiny:end

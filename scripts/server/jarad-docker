@@ -9,6 +9,7 @@ readonly -a ALLOWED_CONTAINERS=(
   "nextcloud-app-1"
   "pihole"
   "portainer"
+  "scrutiny"
   "stirling-pdf"
   "uptime-kuma"
 )

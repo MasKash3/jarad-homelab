@@ -185,6 +185,13 @@ def service_url(subdomain: str, legacy_port: int | None = None, path: str = "") 
     return f"https://{PUBLIC_HOST}{port}{path}"
 
 
+SCRUTINY_URL = env(
+    "JARAD_SCRUTINY_URL",
+    service_url("scrutiny", 8445),
+    "HOMELAB_SCRUTINY_URL",
+)
+
+
 SERVICES: dict[str, dict[str, object]] = {
     "nextcloud": {
         "name": "Nextcloud",
@@ -264,6 +271,17 @@ SERVICES: dict[str, dict[str, object]] = {
         "image": "frooodle/s-pdf:latest",
         "url": service_url("stirling", 8081),
         "color": "#ca8a04",
+        "allowed_actions": ("start", "restart", "stop"),
+    },
+    "scrutiny": {
+        "name": "Scrutiny",
+        "type": "Disk SMART Monitor",
+        "icon": "SC",
+        "container": "scrutiny",
+        "image": "ghcr.io/analogj/scrutiny:v0.9.2-omnibus",
+        "url": SCRUTINY_URL,
+        "color": "#475569",
+        "healthy_label": "Monitor online",
         "allowed_actions": ("start", "restart", "stop"),
     },
 }

@@ -707,6 +707,10 @@ button {
   --app-color: #ca8a04;
 }
 
+.app-color-scrutiny {
+  --app-color: #475569;
+}
+
 .app-color-default {
   --app-color: #138a53;
 }
