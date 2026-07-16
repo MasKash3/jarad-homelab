@@ -1,8 +1,8 @@
-import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.3';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.16.3';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.3';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.3';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.16.3';
+import { APP_VERSION, configActions, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.4';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.16.4';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.4';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.4';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatHealth, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, stateClass, toneClass } from './js/utils.js?v=2026.07.16.4';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -859,6 +859,31 @@ async function refreshState(options = {}) {
   }
 }
 
+async function refreshAllData() {
+  const button = $("#refreshButton");
+  if (button.disabled) return;
+
+  button.disabled = true;
+  button.classList.add("is-refreshing");
+  button.setAttribute("aria-label", "Refreshing data");
+  button.setAttribute("title", "Refreshing data");
+
+  try {
+    await Promise.all([
+      refreshState({ preserveServiceSheet: true }),
+      refreshDnsAccess(),
+      refreshPasskeys(),
+      refreshDeviceTokens()
+    ]);
+  } finally {
+    button.disabled = false;
+    button.classList.remove("is-refreshing");
+    button.setAttribute("aria-label", "Refresh data");
+    button.setAttribute("title", "Refresh data");
+    button.blur();
+  }
+}
+
 async function refreshDnsAccess() {
   try {
     dnsAccess = await api.listDnsClients();
@@ -1142,7 +1167,7 @@ function bindEvents() {
     $("#totpManageError").hidden = true;
   });
 
-  $("#refreshButton").addEventListener("click", () => refreshState({ preserveServiceSheet: true }));
+  $("#refreshButton").addEventListener("click", refreshAllData);
   $("#settingsButton").addEventListener("click", () => $("#settingsSheet").showModal());
   $("#backToServicesButton").addEventListener("click", () => setActiveScreen("services"));
   $("#fingerprintAuthButton").addEventListener("click", completeFingerprintAuth);

@@ -48,6 +48,7 @@ input {
 
 button {
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .icon-sprite {
@@ -166,40 +167,35 @@ button {
 
 .status-meta {
   display: flex;
-  align-items: flex-end;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  flex-direction: row;
+  gap: 6px;
   min-width: 0;
   text-align: right;
-}
-
-.connection-chip {
-  display: inline-flex;
-  max-width: 190px;
-  min-height: 21px;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  padding: 3px 7px;
-  border-radius: 999px;
-  border: 1px solid var(--line-soft);
-  background: var(--surface-2);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.connection-chip {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .connection-chip.live {
-  background: var(--good-bg);
   color: var(--good);
 }
 
 .connection-chip.fallback,
 .connection-chip.disconnected {
-  background: var(--warn-bg);
   color: var(--warn);
+}
+
+.status-meta #lastUpdated {
+  font-size: 11px;
 }
 
 .no-data-panel {
@@ -1203,6 +1199,24 @@ button {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.icon-button.is-refreshing svg {
+  animation: refresh-spin .75s linear infinite;
+}
+
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  button:focus,
+  button:focus-visible {
+    outline: 0;
+    box-shadow: none;
+  }
 }
 
 .action-button {
