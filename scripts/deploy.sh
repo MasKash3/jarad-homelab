@@ -167,6 +167,12 @@ fi
 require_command ssh
 require_command scp
 require_command sha256sum
+require_command git
+if [[ "$backend_only" != true ]]; then
+  require_command node
+  node "$repo_root/scripts/sync-version.mjs" --check
+  node "$repo_root/scripts/check-frontend-security.mjs"
+fi
 frontend_path="$repo_root/frontend"
 backend_path="$repo_root/backend"
 server_scripts_path="$repo_root/scripts/server"
@@ -175,6 +181,17 @@ caddy_path="$repo_root/deploy/caddy"
 remote="${user_name}@${host_name}"
 manifest_file="$(mktemp)"
 trap 'rm -f "$manifest_file"' EXIT
+
+if ! git -C "$repo_root" diff --quiet || ! git -C "$repo_root" diff --cached --quiet; then
+  echo "Tracked files are dirty; commit the exact release before deploying." >&2
+  exit 1
+fi
+release_commit="$(git -C "$repo_root" rev-parse HEAD)"
+release_tag="$(git -C "$repo_root" describe --tags --exact-match HEAD 2>/dev/null || true)"
+if [[ -z "$release_tag" || "$(git -C "$repo_root" cat-file -t "$release_tag" 2>/dev/null || true)" != "tag" ]]; then
+  echo "HEAD must have an annotated release tag before deployment." >&2
+  exit 1
+fi
 
 append_manifest_file() {
   local local_file="$1"
@@ -205,7 +222,7 @@ append_manifest_tree() {
 }
 
 build_deploy_manifest() {
-  : > "$manifest_file"
+  printf '# commit %s\n# tag %s\n' "$release_commit" "$release_tag" > "$manifest_file"
 
   if [[ "$backend_only" != true ]]; then
     append_manifest_tree "$frontend_path" "frontend"
@@ -221,6 +238,7 @@ build_deploy_manifest() {
     append_manifest_file "$server_scripts_path/install-caddy-route.sh" "scripts/server/install-caddy-route.sh"
     append_manifest_file "$server_scripts_path/jarad-dns-access" "scripts/server/jarad-dns-access"
     append_manifest_file "$server_scripts_path/jarad-docker" "scripts/server/jarad-docker"
+    append_manifest_file "$server_scripts_path/jarad-promote-release" "scripts/server/jarad-promote-release"
     append_manifest_file "$systemd_path/jarad-backend.service" "deploy/systemd/jarad-backend.service"
     append_manifest_file "$systemd_path/jarad-frontend.service" "deploy/systemd/jarad-frontend.service"
     append_manifest_file "$caddy_path/jarad.Caddyfile" "deploy/caddy/jarad.Caddyfile"
@@ -276,13 +294,14 @@ if [[ "$frontend_only" != true ]]; then
   run scp "$server_scripts_path/install-caddy-route.sh" "$remote:$remote_root/scripts/server/install-caddy-route.sh"
   run scp "$server_scripts_path/jarad-dns-access" "$remote:$remote_root/scripts/server/jarad-dns-access"
   run scp "$server_scripts_path/jarad-docker" "$remote:$remote_root/scripts/server/jarad-docker"
+  run scp "$server_scripts_path/jarad-promote-release" "$remote:$remote_root/scripts/server/jarad-promote-release"
   run scp \
     "$systemd_path/jarad-backend.service" \
     "$systemd_path/jarad-frontend.service" \
     "$remote:$remote_root/deploy/systemd/"
   run scp "$caddy_path/jarad.Caddyfile" "$remote:$remote_root/deploy/caddy/jarad.Caddyfile"
 
-  run ssh "$remote" "chmod +x $remote_root/scripts/server/restart-backend.sh $remote_root/scripts/server/install-systemd.sh $remote_root/scripts/server/install-caddy-route.sh $remote_root/scripts/server/jarad-dns-access $remote_root/scripts/server/jarad-docker"
+  run ssh "$remote" "chmod +x $remote_root/scripts/server/restart-backend.sh $remote_root/scripts/server/install-systemd.sh $remote_root/scripts/server/install-caddy-route.sh $remote_root/scripts/server/jarad-dns-access $remote_root/scripts/server/jarad-docker $remote_root/scripts/server/jarad-promote-release"
 fi
 
 if [[ "$install_caddy" == true && "$frontend_only" == true ]]; then
@@ -295,6 +314,10 @@ fi
 build_deploy_manifest
 verify_deploy_manifest
 
+promotion_scope="full"
+[[ "$frontend_only" == true ]] && promotion_scope="frontend"
+[[ "$backend_only" == true ]] && promotion_scope="backend"
+
 if [[ "$install_backend_deps" == true ]]; then
   echo "Installing backend dependencies..."
   run ssh "$remote" "cd $remote_root/backend && test -f requirements.lock && python3 -m venv .venv && . .venv/bin/activate && pip install --require-hashes -r requirements.lock"
@@ -302,7 +325,10 @@ fi
 
 if [[ "$install_services" == true ]]; then
   echo "Installing systemd services..."
-  run ssh -tt "$remote" "$remote_root/scripts/server/install-systemd.sh $remote_root $user_name"
+  run ssh -tt "$remote" "$remote_root/scripts/server/install-systemd.sh $remote_root $user_name jarad-backend jarad-frontend $release_commit $release_tag"
+else
+  echo "Promoting verified root-owned release..."
+  run ssh -tt "$remote" "sudo /usr/local/sbin/jarad-promote-release $remote_root $promotion_scope $release_commit $release_tag"
 fi
 
 if [[ "$install_caddy" == true ]]; then

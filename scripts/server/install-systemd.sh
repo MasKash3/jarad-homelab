@@ -5,6 +5,8 @@ REMOTE_ROOT="${1:-$HOME/mobile}"
 DEPLOY_USER="${2:-$(id -un)}"
 BACKEND_USER="${3:-jarad-backend}"
 FRONTEND_USER="${4:-jarad-frontend}"
+RELEASE_COMMIT="${5:-}"
+RELEASE_TAG="${6:-}"
 TEMPLATE_DIR="$REMOTE_ROOT/deploy/systemd"
 
 ensure_service_account() {
@@ -37,6 +39,10 @@ if [ ! -d "$TEMPLATE_DIR" ]; then
   echo "Missing systemd template directory: $TEMPLATE_DIR" >&2
   exit 1
 fi
+if [[ ! "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || [[ ! "$RELEASE_TAG" =~ ^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}\.[0-9]+$ ]]; then
+  echo "A full release commit and vYYYY.MM.DD.N release tag are required." >&2
+  exit 1
+fi
 
 mapfile -t residual_env_files < <(
   find "$REMOTE_ROOT/backend" -maxdepth 1 -type f \
@@ -49,15 +55,20 @@ if (( ${#residual_env_files[@]} > 0 )); then
   exit 1
 fi
 
-if [ -f "$REMOTE_ROOT/backend/.env" ]; then
-  if grep -Eqi '^[[:space:]]*(JARAD|HOMELAB)_ALLOW_INSECURE_DEFAULTS[[:space:]]*=[[:space:]]*(1|true|yes)[[:space:]]*$' "$REMOTE_ROOT/backend/.env"; then
+ENV_SOURCE="$REMOTE_ROOT/backend/.env"
+ENV_TARGET="/etc/jarad/backend.env"
+if [ -f "$ENV_SOURCE" ]; then
+  if grep -Eqi '^[[:space:]]*(JARAD|HOMELAB)_ALLOW_INSECURE_DEFAULTS[[:space:]]*=[[:space:]]*(1|true|yes)[[:space:]]*$' "$ENV_SOURCE"; then
     echo "Production service installation refuses ALLOW_INSECURE_DEFAULTS." >&2
     exit 1
   fi
-  if grep -Eqi '^[[:space:]]*(JARAD|HOMELAB)_ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP[[:space:]]*=[[:space:]]*(1|true|yes)[[:space:]]*$' "$REMOTE_ROOT/backend/.env"; then
+  if grep -Eqi '^[[:space:]]*(JARAD|HOMELAB)_ALLOW_PASSKEY_BOOTSTRAP_WITHOUT_TOTP[[:space:]]*=[[:space:]]*(1|true|yes)[[:space:]]*$' "$ENV_SOURCE"; then
     echo "Production service installation refuses passkey bootstrap without TOTP." >&2
     exit 1
   fi
+elif ! sudo test -f "$ENV_TARGET"; then
+  echo "Missing backend environment. Provide $ENV_SOURCE for first migration." >&2
+  exit 1
 fi
 
 ensure_service_account "$BACKEND_USER"
@@ -90,9 +101,13 @@ if [ ! -d "$REMOTE_ROOT/backend/.venv" ]; then
   python3 -m venv "$REMOTE_ROOT/backend/.venv"
 fi
 
-if [ -f "$REMOTE_ROOT/backend/.env" ]; then
-  sudo chown "$DEPLOY_USER:$BACKEND_USER" "$REMOTE_ROOT/backend/.env"
-  sudo chmod 0640 "$REMOTE_ROOT/backend/.env"
+if [ -f "$ENV_SOURCE" ]; then
+  sudo install -d -o root -g root -m 0755 /etc/jarad
+  sudo install -o root -g "$BACKEND_USER" -m 0640 "$ENV_SOURCE" "$ENV_TARGET"
+  sudo rm -f "$ENV_SOURCE"
+else
+  sudo chown root:"$BACKEND_USER" "$ENV_TARGET"
+  sudo chmod 0640 "$ENV_TARGET"
 fi
 
 # shellcheck disable=SC1091
@@ -105,6 +120,13 @@ pip install --require-hashes -r "$REMOTE_ROOT/backend/requirements.lock"
 sudo chown -R "$DEPLOY_USER:$BACKEND_USER" "$REMOTE_ROOT/backend"
 sudo chmod -R u=rwX,g=rX,o= "$REMOTE_ROOT/backend"
 sudo chmod 2750 "$REMOTE_ROOT/backend"
+
+if [ ! -f "$REMOTE_ROOT/scripts/server/jarad-promote-release" ]; then
+  echo "Missing Jarad release promotion helper." >&2
+  exit 1
+fi
+sudo install -o root -g root -m 0755 "$REMOTE_ROOT/scripts/server/jarad-promote-release" /usr/local/sbin/jarad-promote-release
+sudo /usr/local/sbin/jarad-promote-release "$REMOTE_ROOT" full "$RELEASE_COMMIT" "$RELEASE_TAG"
 
 for legacy_service in homelab-mobile-backend.service homelab-mobile-frontend.service; do
   if systemctl list-unit-files "$legacy_service" --no-legend 2>/dev/null | grep -q "$legacy_service"; then
@@ -148,8 +170,12 @@ sudo visudo -cf /etc/sudoers.d/jarad-docker >/dev/null
 
 sudo systemctl daemon-reload
 sudo systemctl reset-failed
-if sudo -u "$FRONTEND_USER" test -r "$REMOTE_ROOT/backend/.env"; then
+if sudo -u "$FRONTEND_USER" test -r "$ENV_TARGET"; then
   echo "Frontend service account can read backend secrets; refusing to start services." >&2
+  exit 1
+fi
+if sudo -u "$DEPLOY_USER" test -r "$ENV_TARGET"; then
+  echo "Deployment account can read live backend secrets; refusing to start services." >&2
   exit 1
 fi
 sudo systemctl enable --now jarad-backend.service

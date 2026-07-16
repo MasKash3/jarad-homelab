@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REMOTE_ROOT="${1:-}"
+SCOPE="${2:-}"
+RELEASE_COMMIT="${3:-}"
+RELEASE_TAG="${4:-}"
+LIVE_ROOT="/opt/jarad"
+
+fail() {
+  echo "Release promotion refused: $*" >&2
+  exit 1
+}
+
+if (( EUID != 0 )); then
+  fail "run this helper through sudo"
+fi
+if [[ -z "$REMOTE_ROOT" || -z "$SCOPE" || -z "$RELEASE_COMMIT" || -z "$RELEASE_TAG" ]]; then
+  fail "usage: jarad-promote-release <remote-root> <full|frontend|backend> <commit> <tag>"
+fi
+if [[ ! "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+  fail "release commit must be a full Git SHA-1"
+fi
+if [[ ! "$RELEASE_TAG" =~ ^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}\.[0-9]+$ ]]; then
+  fail "release tag must use vYYYY.MM.DD.N"
+fi
+if [[ "$SCOPE" != "full" && "$SCOPE" != "frontend" && "$SCOPE" != "backend" ]]; then
+  fail "scope must be full, frontend, or backend"
+fi
+
+REMOTE_ROOT="$(realpath "$REMOTE_ROOT")"
+if [[ "$REMOTE_ROOT" == "/" || ! -d "$REMOTE_ROOT" ]]; then
+  fail "invalid remote staging root"
+fi
+
+MANIFEST="$REMOTE_ROOT/deploy/jarad-deploy.sha256"
+[[ -f "$MANIFEST" ]] || fail "missing deployment manifest"
+grep -Fxq "# commit $RELEASE_COMMIT" "$MANIFEST" || fail "manifest commit does not match requested release"
+grep -Fxq "# tag $RELEASE_TAG" "$MANIFEST" || fail "manifest tag does not match requested release"
+(cd "$REMOTE_ROOT" && sha256sum -c "$MANIFEST") || fail "staged file hash verification failed"
+
+prepare_next_tree() {
+  local target_dir="$1"
+  local service_group="$2"
+  local next_dir="${target_dir}.next"
+  local previous_dir="${target_dir}.previous"
+
+  [[ "$target_dir" == "$LIVE_ROOT/"* ]] || fail "unsafe live target"
+  rm -rf -- "$next_dir" "$previous_dir"
+  install -d -o root -g "$service_group" -m 0750 "$next_dir"
+}
+
+copy_manifest_prefix() {
+  local prefix="$1"
+  local target_dir="$2"
+  local manifest_path
+  local relative_path
+  local source_path
+
+  while IFS= read -r manifest_path; do
+    [[ "$manifest_path" == "$prefix/"* ]] || continue
+    relative_path="${manifest_path#"$prefix/"}"
+    [[ -n "$relative_path" && "$relative_path" != *".."* ]] || fail "unsafe manifest path"
+    source_path="$REMOTE_ROOT/$manifest_path"
+    [[ -f "$source_path" && ! -L "$source_path" ]] || fail "manifest source is not a regular file: $manifest_path"
+    install -D -m 0640 "$source_path" "$target_dir/$relative_path"
+  done < <(awk 'NF == 2 && length($1) == 64 && $1 ~ /^[0-9a-f]+$/ { print $2 }' "$MANIFEST")
+}
+
+activate_next_tree() {
+  local target_dir="$1"
+  local service_group="$2"
+  local next_dir="${target_dir}.next"
+  local previous_dir="${target_dir}.previous"
+
+  chown -R root:"$service_group" "$next_dir"
+  chmod -R u=rwX,g=rX,o= "$next_dir"
+
+  if [[ -e "$target_dir" ]]; then
+    mv "$target_dir" "$previous_dir"
+  fi
+  mv "$next_dir" "$target_dir"
+  rm -rf -- "$previous_dir"
+}
+
+install_scope_manifest() {
+  local prefix="$1"
+  local target_dir="$2"
+  local service_group="$3"
+  local output_file="$target_dir/.release.sha256"
+
+  awk -v prefix="$prefix/" '
+    NF == 2 && length($1) == 64 && $1 ~ /^[0-9a-f]+$/ && index($2, prefix) == 1 {
+      print $1 "  " substr($2, length(prefix) + 1)
+    }
+  ' "$MANIFEST" > "$output_file"
+  [[ -s "$output_file" ]] || fail "scope manifest is empty for $prefix"
+  chown root:"$service_group" "$output_file"
+  chmod 0640 "$output_file"
+  (cd "$target_dir" && sha256sum -c .release.sha256) || fail "promoted $prefix integrity verification failed"
+}
+
+promote_frontend() {
+  [[ -d "$REMOTE_ROOT/frontend" ]] || fail "missing staged frontend"
+  prepare_next_tree "$LIVE_ROOT/frontend" "jarad-frontend"
+  copy_manifest_prefix "frontend" "$LIVE_ROOT/frontend.next"
+  [[ -f "$LIVE_ROOT/frontend.next/index.html" ]] || fail "promoted frontend is missing index.html"
+  activate_next_tree "$LIVE_ROOT/frontend" "jarad-frontend"
+  install_scope_manifest "frontend" "$LIVE_ROOT/frontend" "jarad-frontend"
+}
+
+promote_backend() {
+  local source_dir="$REMOTE_ROOT/backend"
+  local next_dir="$LIVE_ROOT/backend.next"
+  local target_dir="$LIVE_ROOT/backend"
+
+  [[ -d "$source_dir/jarad_backend" ]] || fail "missing staged backend package"
+  [[ -d "$source_dir/.venv" ]] || fail "missing staged backend virtual environment"
+  prepare_next_tree "$target_dir" "jarad-backend"
+  copy_manifest_prefix "backend" "$next_dir"
+  cp -a "$source_dir/.venv" "$next_dir/"
+  [[ -f "$next_dir/jarad_backend/main.py" ]] || fail "promoted backend is missing main.py"
+  activate_next_tree "$target_dir" "jarad-backend"
+  install_scope_manifest "backend" "$target_dir" "jarad-backend"
+}
+
+install -d -o root -g root -m 0755 "$LIVE_ROOT"
+case "$SCOPE" in
+  full)
+    promote_backend
+    promote_frontend
+    ;;
+  frontend)
+    promote_frontend
+    ;;
+  backend)
+    promote_backend
+    ;;
+esac
+
+install -o root -g root -m 0644 "$MANIFEST" "$LIVE_ROOT/deploy-manifest.sha256"
+printf '%s\n' "$RELEASE_COMMIT" > "$LIVE_ROOT/RELEASE_COMMIT"
+printf '%s\n' "$RELEASE_TAG" > "$LIVE_ROOT/RELEASE_TAG"
+chmod 0644 "$LIVE_ROOT/RELEASE_COMMIT" "$LIVE_ROOT/RELEASE_TAG"
+
+echo "Promoted Jarad release $RELEASE_TAG ($RELEASE_COMMIT) with scope $SCOPE."

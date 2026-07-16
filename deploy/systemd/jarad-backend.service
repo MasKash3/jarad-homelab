@@ -7,13 +7,14 @@ Wants=network-online.target
 Type=simple
 User=__BACKEND_USER__
 Group=__BACKEND_USER__
-WorkingDirectory=/opt/jarad/app
-EnvironmentFile=-__REMOTE_ROOT__/backend/.env
+WorkingDirectory=/opt/jarad/backend
+EnvironmentFile=-/etc/jarad/backend.env
 Environment=JARAD_BACKEND_HOST=127.0.0.1
 Environment=JARAD_BACKEND_PORT=8443
 Environment=JARAD_DOCKER_HELPER=/usr/local/sbin/jarad-docker
 Environment=JARAD_DB_PATH=/var/lib/jarad/jarad.sqlite3
-ExecStart=/usr/bin/env JARAD_DB_PATH=/var/lib/jarad/jarad.sqlite3 JARAD_DOCKER_HELPER=/usr/local/sbin/jarad-docker /opt/jarad/app/.venv/bin/python -m uvicorn jarad_backend.main:app --host ${JARAD_BACKEND_HOST} --port ${JARAD_BACKEND_PORT}
+ExecStartPre=/usr/bin/sha256sum -c /opt/jarad/backend/.release.sha256
+ExecStart=/usr/bin/env JARAD_DB_PATH=/var/lib/jarad/jarad.sqlite3 JARAD_DOCKER_HELPER=/usr/local/sbin/jarad-docker /opt/jarad/backend/.venv/bin/python -m uvicorn jarad_backend.main:app --host ${JARAD_BACKEND_HOST} --port ${JARAD_BACKEND_PORT}
 Restart=on-failure
 RestartSec=5
 UMask=0077
@@ -22,7 +23,6 @@ NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-BindReadOnlyPaths=__REMOTE_ROOT__/backend:/opt/jarad/app
 StateDirectory=jarad
 StateDirectoryMode=0700
 ReadWritePaths=/var/lib/jarad
