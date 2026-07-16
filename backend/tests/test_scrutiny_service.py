@@ -29,13 +29,13 @@ class ScrutinyServiceTests(unittest.TestCase):
         self.assertTrue(is_allowed_action("scrutiny", "restart"))
         self.assertFalse(is_allowed_action("scrutiny", "exec"))
 
-    def test_scrutiny_diagnostics_do_not_claim_drive_health(self):
+    def test_scrutiny_diagnostics_describe_summary_alert_boundary(self):
         diagnostics = diagnostics_for("scrutiny", running=True, health="healthy", docker_unavailable=False)
 
         self.assertIn(
             [
                 "Drive SMART health",
-                "Unchecked here; open Scrutiny for disk-specific health and history",
+                "Summary alerts imported; open Scrutiny for affected attributes and history",
             ],
             diagnostics,
         )

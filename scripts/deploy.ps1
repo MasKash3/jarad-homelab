@@ -128,6 +128,10 @@ if (-not $FrontendOnly) {
     "${remote}:$RemoteRoot/scripts/server/install-scrutiny-caddy-route.sh"
   )
   Invoke-Checked "scp" @(
+    (Join-Path $serverScriptsPath "configure-scrutiny-telegram.sh"),
+    "${remote}:$RemoteRoot/scripts/server/configure-scrutiny-telegram.sh"
+  )
+  Invoke-Checked "scp" @(
     (Join-Path $serverScriptsPath "jarad-dns-access"),
     "${remote}:$RemoteRoot/scripts/server/jarad-dns-access"
   )
@@ -145,7 +149,7 @@ if (-not $FrontendOnly) {
     (Join-Path $caddyPath "scrutiny.Caddyfile"),
     "${remote}:$RemoteRoot/deploy/caddy/"
   )
-  Invoke-Checked "ssh" @($remote, "chmod +x $RemoteRoot/scripts/server/restart-backend.sh $RemoteRoot/scripts/server/install-systemd.sh $RemoteRoot/scripts/server/install-caddy-route.sh $RemoteRoot/scripts/server/install-scrutiny.sh $RemoteRoot/scripts/server/install-scrutiny-caddy-route.sh $RemoteRoot/scripts/server/jarad-dns-access $RemoteRoot/scripts/server/jarad-docker")
+  Invoke-Checked "ssh" @($remote, "chmod +x $RemoteRoot/scripts/server/restart-backend.sh $RemoteRoot/scripts/server/install-systemd.sh $RemoteRoot/scripts/server/install-caddy-route.sh $RemoteRoot/scripts/server/install-scrutiny.sh $RemoteRoot/scripts/server/install-scrutiny-caddy-route.sh $RemoteRoot/scripts/server/configure-scrutiny-telegram.sh $RemoteRoot/scripts/server/jarad-dns-access $RemoteRoot/scripts/server/jarad-docker")
 }
 
 if ($InstallCaddy -and $FrontendOnly) {

@@ -192,6 +192,41 @@ SCRUTINY_URL = env(
 )
 
 
+def loopback_http_url(value: str, setting_name: str, required_path: str) -> str:
+    raw_value = value.strip()
+    parsed = urlsplit(raw_value)
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname not in LOOPBACK_HOSTS
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path != required_path
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise RuntimeError(
+            f"{setting_name} must be an HTTP loopback URL ending in {required_path} "
+            "without credentials, query parameters, or fragments."
+        )
+    return raw_value
+
+
+SCRUTINY_API_URL = loopback_http_url(
+    env(
+        "JARAD_SCRUTINY_API_URL",
+        "http://127.0.0.1:8080/api/summary",
+        "HOMELAB_SCRUTINY_API_URL",
+    ),
+    "JARAD_SCRUTINY_API_URL",
+    "/api/summary",
+)
+SCRUTINY_STALE_HOURS = positive_int_env(
+    "JARAD_SCRUTINY_STALE_HOURS",
+    "36",
+    "HOMELAB_SCRUTINY_STALE_HOURS",
+)
+
+
 SERVICES: dict[str, dict[str, object]] = {
     "nextcloud": {
         "name": "Nextcloud",

@@ -139,7 +139,7 @@ def diagnostics_for(service_id: str, running: bool, health: str, docker_unavaila
             2,
             [
                 "Drive SMART health",
-                "Unchecked here; open Scrutiny for disk-specific health and history",
+                "Summary alerts imported; open Scrutiny for affected attributes and history",
             ],
         )
     return checks
@@ -205,7 +205,12 @@ def network_state() -> list[list[str]]:
     ]
 
 
-def alerts_for(services: list[dict[str, Any]], disk_pct: int, backup_state: str) -> list[dict[str, str]]:
+def alerts_for(
+    services: list[dict[str, Any]],
+    disk_pct: int,
+    backup_state: str,
+    disk_health_alerts: list[dict[str, str]] | None = None,
+) -> list[dict[str, str]]:
     alerts: list[dict[str, str]] = []
     for service in services:
         if service["health"] == "down":
@@ -245,6 +250,7 @@ def alerts_for(services: list[dict[str, Any]], disk_pct: int, backup_state: str)
                 "body": "Check backup log and Cloud backup sync status.",
             }
         )
+    alerts.extend(disk_health_alerts or [])
     if not alerts:
         alerts.append(
             {

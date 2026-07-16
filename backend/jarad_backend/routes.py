@@ -38,6 +38,7 @@ from .models import (
 )
 from .rate_limit import enforce_rate_limit
 from .redaction import redact_sensitive_text
+from .scrutiny import scrutiny_alerts
 from .services import alerts_for, build_services, network_state, recent_logs
 from .webauthn_auth import (
     begin_authentication,
@@ -379,6 +380,8 @@ def mobile_state() -> dict[str, Any]:
     disk_pct, disk_label = read_disk()
     backup = read_backup_state()
     services = build_services()
+    scrutiny_service = next((service for service in services if service.get("id") == "scrutiny"), None)
+    disk_health_alerts = scrutiny_alerts() if scrutiny_service and scrutiny_service.get("health") == "healthy" else []
     temp = read_temp_c()
     metrics = [
         {"label": "CPU", "value": read_cpu_pct(), "unit": "%", "state": "good"},
@@ -395,8 +398,17 @@ def mobile_state() -> dict[str, Any]:
 
     down_count = sum(1 for service in services if service["health"] == "down")
     degraded_count = sum(1 for service in services if service["health"] == "degraded")
-    status = "Operational" if down_count == 0 and degraded_count == 0 else "Attention needed"
-    score = max(0, 100 - (down_count * 20) - (degraded_count * 8))
+    disk_bad_count = sum(1 for alert in disk_health_alerts if alert.get("state") == "bad")
+    disk_warn_count = sum(1 for alert in disk_health_alerts if alert.get("state") == "warn")
+    status = (
+        "Operational"
+        if down_count == 0 and degraded_count == 0 and disk_bad_count == 0 and disk_warn_count == 0
+        else "Attention needed"
+    )
+    score = max(
+        0,
+        100 - (down_count * 20) - (degraded_count * 8) - (disk_bad_count * 20) - (disk_warn_count * 8),
+    )
 
     return {
         "updatedAt": datetime.now(timezone.utc).isoformat(),
@@ -419,7 +431,7 @@ def mobile_state() -> dict[str, Any]:
         "backups": backup,
         "services": services,
         "logs": recent_logs(),
-        "alerts": alerts_for(services, disk_pct, backup["state"]),
+        "alerts": alerts_for(services, disk_pct, backup["state"], disk_health_alerts),
         "network": network_state(),
     }
 

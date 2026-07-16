@@ -238,6 +238,7 @@ build_deploy_manifest() {
     append_manifest_file "$server_scripts_path/install-caddy-route.sh" "scripts/server/install-caddy-route.sh"
     append_manifest_file "$server_scripts_path/install-scrutiny.sh" "scripts/server/install-scrutiny.sh"
     append_manifest_file "$server_scripts_path/install-scrutiny-caddy-route.sh" "scripts/server/install-scrutiny-caddy-route.sh"
+    append_manifest_file "$server_scripts_path/configure-scrutiny-telegram.sh" "scripts/server/configure-scrutiny-telegram.sh"
     append_manifest_file "$server_scripts_path/jarad-dns-access" "scripts/server/jarad-dns-access"
     append_manifest_file "$server_scripts_path/jarad-docker" "scripts/server/jarad-docker"
     append_manifest_file "$server_scripts_path/jarad-promote-release" "scripts/server/jarad-promote-release"
@@ -297,6 +298,7 @@ if [[ "$frontend_only" != true ]]; then
   run scp "$server_scripts_path/install-caddy-route.sh" "$remote:$remote_root/scripts/server/install-caddy-route.sh"
   run scp "$server_scripts_path/install-scrutiny.sh" "$remote:$remote_root/scripts/server/install-scrutiny.sh"
   run scp "$server_scripts_path/install-scrutiny-caddy-route.sh" "$remote:$remote_root/scripts/server/install-scrutiny-caddy-route.sh"
+  run scp "$server_scripts_path/configure-scrutiny-telegram.sh" "$remote:$remote_root/scripts/server/configure-scrutiny-telegram.sh"
   run scp "$server_scripts_path/jarad-dns-access" "$remote:$remote_root/scripts/server/jarad-dns-access"
   run scp "$server_scripts_path/jarad-docker" "$remote:$remote_root/scripts/server/jarad-docker"
   run scp "$server_scripts_path/jarad-promote-release" "$remote:$remote_root/scripts/server/jarad-promote-release"
@@ -307,7 +309,7 @@ if [[ "$frontend_only" != true ]]; then
   run scp "$caddy_path/jarad.Caddyfile" "$remote:$remote_root/deploy/caddy/jarad.Caddyfile"
   run scp "$caddy_path/scrutiny.Caddyfile" "$remote:$remote_root/deploy/caddy/scrutiny.Caddyfile"
 
-  run ssh "$remote" "chmod +x $remote_root/scripts/server/restart-backend.sh $remote_root/scripts/server/install-systemd.sh $remote_root/scripts/server/install-caddy-route.sh $remote_root/scripts/server/install-scrutiny.sh $remote_root/scripts/server/install-scrutiny-caddy-route.sh $remote_root/scripts/server/jarad-dns-access $remote_root/scripts/server/jarad-docker $remote_root/scripts/server/jarad-promote-release"
+  run ssh "$remote" "chmod +x $remote_root/scripts/server/restart-backend.sh $remote_root/scripts/server/install-systemd.sh $remote_root/scripts/server/install-caddy-route.sh $remote_root/scripts/server/install-scrutiny.sh $remote_root/scripts/server/install-scrutiny-caddy-route.sh $remote_root/scripts/server/configure-scrutiny-telegram.sh $remote_root/scripts/server/jarad-dns-access $remote_root/scripts/server/jarad-docker $remote_root/scripts/server/jarad-promote-release"
 fi
 
 if [[ "$install_caddy" == true && "$frontend_only" == true ]]; then
