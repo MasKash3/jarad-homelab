@@ -1,8 +1,8 @@
-import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.8';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.16.8';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.8';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.8';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, serviceHealthLabel, stateClass, toneClass } from './js/utils.js?v=2026.07.16.8';
+import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.11';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.16.11';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.11';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.11';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, serviceHealthLabel, stateClass, toneClass } from './js/utils.js?v=2026.07.16.11';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -123,6 +123,25 @@ function backupStateClass(value) {
 
 function percentValue(value) {
   return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+}
+
+function formatDriveCapacity(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "";
+  const bytes = Math.max(0, Number(value));
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+  let unitIndex = 0;
+  let displayValue = bytes;
+  while (displayValue >= 1000 && unitIndex < units.length - 1) {
+    displayValue /= 1000;
+    unitIndex += 1;
+  }
+  const digits = displayValue >= 100 || unitIndex === 0 ? 0 : displayValue >= 10 ? 1 : 2;
+  return `${displayValue.toFixed(digits)} ${units[unitIndex]}`;
+}
+
+function formatDriveHours(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "Unavailable";
+  return `${Math.max(0, Math.round(Number(value))).toLocaleString()}h`;
 }
 
 function raidStateClass(value) {
@@ -269,6 +288,7 @@ function renderAlerts() {
       <p>${escapeHtml(alert.body)}</p>
     </article>
   `).join("");
+  renderDrives();
   // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#networkGrid").innerHTML = state.network.map(([label, value]) => `
     <div>
@@ -277,6 +297,85 @@ function renderAlerts() {
     </div>
   `).join("");
   renderDnsAccess();
+}
+
+function renderDrives() {
+  const drives = state.drives || {
+    available: false,
+    state: "warn",
+    message: "Drive health data is unavailable.",
+    summary: { healthy: 0, warning: 0, critical: 0 },
+    items: []
+  };
+  const items = Array.isArray(drives.items) ? drives.items : [];
+  const summary = drives.summary || {};
+  const critical = Number(summary.critical) || 0;
+  const warning = Number(summary.warning) || 0;
+  const healthy = Number(summary.healthy) || 0;
+  const summaryTone = drives.available ? critical ? "bad" : warning ? "warn" : "good" : toneClass(drives.state || "warn");
+  const summaryLabel = !drives.available
+    ? "Unavailable"
+    : critical
+    ? `${critical} critical`
+    : warning
+    ? `${warning} warning`
+    : `${healthy} healthy`;
+
+  $("#driveSummary").textContent = summaryLabel;
+  $("#driveSummary").className = `pill ${summaryTone}`;
+  $("#driveHelp").textContent = drives.message || "Drive health data is unavailable.";
+  $("#driveHelp").className = `config-help ${summaryTone}`;
+
+  const scrutinyService = (state.services || []).find((service) => service.id === "scrutiny");
+  const scrutinyUrl = scrutinyService?.url ? safeUrl(scrutinyService.url) : "#";
+  const scrutinyLink = $("#openScrutinyLink");
+  scrutinyLink.href = scrutinyUrl;
+  scrutinyLink.hidden = scrutinyUrl === "#";
+
+  if (!drives.available || items.length === 0) {
+    // xss-reviewed: dynamic template values use escaping or whitelist helpers.
+    $("#driveList").innerHTML = noDataPanel(
+      drives.available ? "No Drives" : "Drive Health Unavailable",
+      drives.message || "Scrutiny has not returned any monitored drives."
+    );
+    return;
+  }
+
+  // xss-reviewed: dynamic template values use escaping or whitelist helpers.
+  $("#driveList").innerHTML = items.map((drive) => {
+    const tone = toneClass(drive.state);
+    const capacity = formatDriveCapacity(drive.capacityBytes);
+    const meta = [drive.deviceName, capacity, drive.interface].filter(Boolean).join(" / ");
+    const temperature = drive.temperatureC === null || drive.temperatureC === undefined
+      ? "Unavailable"
+      : `${escapeHtml(drive.temperatureC)}°C`;
+    const collected = drive.lastCollectedAt ? formatUpdated(drive.lastCollectedAt) : "Awaiting data";
+    return `
+      <article class="drive-card ${escapeAttr(tone)}">
+        <div class="drive-card-head">
+          <div>
+            <strong>${escapeHtml(drive.label || "Monitored drive")}</strong>
+            <span>${escapeHtml(meta || drive.model || "Drive details unavailable")}</span>
+          </div>
+          <span class="pill ${escapeAttr(tone)}">${escapeHtml(drive.statusLabel || "Unknown")}</span>
+        </div>
+        <div class="drive-metrics">
+          <div>
+            <span>Temperature</span>
+            <strong>${temperature}</strong>
+          </div>
+          <div>
+            <span>Power-on</span>
+            <strong>${escapeHtml(formatDriveHours(drive.powerOnHours))}</strong>
+          </div>
+          <div>
+            <span>Collected</span>
+            <strong>${escapeHtml(collected)}</strong>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function renderDnsAccess() {

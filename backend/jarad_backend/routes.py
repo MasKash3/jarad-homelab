@@ -38,7 +38,7 @@ from .models import (
 )
 from .rate_limit import enforce_rate_limit
 from .redaction import redact_sensitive_text
-from .scrutiny import scrutiny_alerts
+from .scrutiny import scrutiny_snapshot
 from .services import alerts_for, build_services, network_state, recent_logs
 from .webauthn_auth import (
     begin_authentication,
@@ -381,7 +381,18 @@ def mobile_state() -> dict[str, Any]:
     backup = read_backup_state()
     services = build_services()
     scrutiny_service = next((service for service in services if service.get("id") == "scrutiny"), None)
-    disk_health_alerts = scrutiny_alerts() if scrutiny_service and scrutiny_service.get("health") == "healthy" else []
+    if scrutiny_service and scrutiny_service.get("health") == "healthy":
+        drive_snapshot = scrutiny_snapshot()
+    else:
+        drive_snapshot = {
+            "available": False,
+            "state": "bad",
+            "message": "Scrutiny is not running, so drive health is unavailable.",
+            "summary": {"healthy": 0, "warning": 0, "critical": 0},
+            "items": [],
+            "alerts": [],
+        }
+    disk_health_alerts = drive_snapshot["alerts"]
     temp = read_temp_c()
     metrics = [
         {"label": "CPU", "value": read_cpu_pct(), "unit": "%", "state": "good"},
@@ -432,6 +443,7 @@ def mobile_state() -> dict[str, Any]:
         "services": services,
         "logs": recent_logs(),
         "alerts": alerts_for(services, disk_pct, backup["state"], disk_health_alerts),
+        "drives": {key: value for key, value in drive_snapshot.items() if key != "alerts"},
         "network": network_state(),
     }
 

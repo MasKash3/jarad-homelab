@@ -607,6 +607,10 @@ button {
   color: var(--good);
 }
 
+.config-help.warn {
+  color: var(--warn);
+}
+
 .config-help.bad {
   color: var(--bad);
 }
@@ -973,6 +977,107 @@ button {
   border-left-color: var(--good);
 }
 
+.drive-panel {
+  margin-top: 12px;
+}
+
+.drive-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.drive-list .no-data-panel {
+  grid-column: 1 / -1;
+}
+
+.drive-card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left-width: 5px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.drive-card.good {
+  border-left-color: var(--good);
+}
+
+.drive-card.warn {
+  border-left-color: var(--warn);
+}
+
+.drive-card.bad {
+  border-left-color: var(--bad);
+}
+
+.drive-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.drive-card-head > div {
+  min-width: 0;
+}
+
+.drive-card-head strong,
+.drive-card-head span {
+  display: block;
+}
+
+.drive-card-head strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.drive-card-head > div > span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.drive-card-head .pill {
+  flex: 0 0 auto;
+  max-width: 48%;
+  text-align: center;
+  white-space: normal;
+}
+
+.drive-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.drive-metrics div {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  background: rgba(8, 14, 20, .52);
+}
+
+.drive-metrics span,
+.drive-metrics strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.drive-metrics span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.drive-metrics strong {
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 12px;
+}
+
 .network-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1174,6 +1279,13 @@ button {
   background: var(--surface-2);
   color: var(--ink);
   font-size: 13px;
+}
+
+.text-button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 
 .icon-button {

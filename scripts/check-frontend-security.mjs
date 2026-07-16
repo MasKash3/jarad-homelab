@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const frontendDir = path.join(rootDir, "frontend");
 const reviewMarker = "xss-reviewed: dynamic template values use escaping or whitelist helpers.";
-const expectedHtmlSinks = 12;
+const expectedHtmlSinks = 14;
 const utilsSource = readFileSync(path.join(frontendDir, "js", "utils.js"), "utf8");
 const { escapeAttr, escapeHtml } = await import(`data:text/javascript;base64,${Buffer.from(utilsSource).toString("base64")}`);
 const authSource = readFileSync(path.join(frontendDir, "js", "auth.js"), "utf8");

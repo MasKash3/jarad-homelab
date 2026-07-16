@@ -47,6 +47,17 @@ export function createNoDataState(reason = "Connect to the Jarad backend to load
         body: reason
       }
     ],
+    drives: {
+      available: false,
+      state: "warn",
+      message: "Drive health is unavailable without a live backend connection.",
+      summary: {
+        healthy: 0,
+        warning: 0,
+        critical: 0
+      },
+      items: []
+    },
     network: [
       ["Backend", "Disconnected"],
       ["Data source", "No live data"]

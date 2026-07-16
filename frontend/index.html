@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#050b10">
     <title>Jarad</title>
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="stylesheet" href="styles.css?v=2026.07.16.8" integrity="sha384-l+VYCG7k0f2g1ZcG561I2uTDhS8GGoVCxUp/KlisZsrpYy5cGMWMKnAvWkDekPW/" crossorigin="anonymous">
+    <link rel="stylesheet" href="styles.css?v=2026.07.16.11" integrity="sha384-eSOTXtuB+4gMBs3/eJTEJhLuV4qGizDHCcYwfAWi2o7WErLj6YZWwWykKHyqiipB" crossorigin="anonymous">
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true">
@@ -64,7 +64,7 @@
           <p class="eyebrow">Private network</p>
           <div class="brand-line">
             <h1>Jarad</h1>
-            <span class="version-chip" id="appVersion">v2026.07.16.8</span>
+            <span class="version-chip" id="appVersion">v2026.07.16.11</span>
           </div>
         </div>
         <div class="topbar-actions">
@@ -195,6 +195,19 @@
             <span class="pill good" id="activeAlertCount">0 active</span>
           </div>
           <div class="alert-list" id="alertList"></div>
+
+          <section class="panel drive-panel">
+            <div class="section-head">
+              <h3>Drives</h3>
+              <div class="section-actions">
+                <span class="pill muted" id="driveSummary">Unavailable</span>
+                <a class="text-button text-button-link" id="openScrutinyLink" href="#" target="_blank" rel="noreferrer" hidden>Open Scrutiny</a>
+              </div>
+            </div>
+            <p class="config-help" id="driveHelp">Connect to the backend to load drive health.</p>
+            <div class="drive-list" id="driveList" aria-live="polite"></div>
+          </section>
+
           <section class="panel">
             <div class="section-head">
               <h3>Network Center</h3>
@@ -381,7 +394,7 @@
       </form>
     </dialog>
 
-    <script src="js/error-handler.js?v=2026.07.16.8" integrity="sha384-COJQP6sGcgP5gJPYrRtU5vcQL+H/vD3Ak2X0ESKlh4RJ8uKWulkz8sdHTS3WWqkG" crossorigin="anonymous"></script>
-    <script src="app.js?v=2026.07.16.8" type="module" integrity="sha384-auA4eqkfhOWQa2MBBIYR6lgtZ0qPq25tSik/DuDBd6Oa2sqfmr6e0+KbAzw+72BJ" crossorigin="anonymous"></script>
+    <script src="js/error-handler.js?v=2026.07.16.11" integrity="sha384-COJQP6sGcgP5gJPYrRtU5vcQL+H/vD3Ak2X0ESKlh4RJ8uKWulkz8sdHTS3WWqkG" crossorigin="anonymous"></script>
+    <script src="app.js?v=2026.07.16.11" type="module" integrity="sha384-WH/cWfCSAkgHohHB7Y3sS+UB7HlAAEWoszIz1EsqOUK7dvzwliV1bGnj3UygJnWV" crossorigin="anonymous"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-export const APP_VERSION = "2026.07.16.8";
+export const APP_VERSION = "2026.07.16.11";
 
 export const storageKeys = {
   audit: "jarad.audit",
