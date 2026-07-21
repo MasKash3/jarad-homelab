@@ -1,8 +1,8 @@
-import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.16.11';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.16.11';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.16.11';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.16.11';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, serviceHealthLabel, stateClass, toneClass } from './js/utils.js?v=2026.07.16.11';
+import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.21.1';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.21.1';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.21.1';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.21.1';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, serviceHealthLabel, stateClass, toneClass } from './js/utils.js?v=2026.07.21.1';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -404,10 +404,13 @@ function renderDnsAccess() {
     const meta = [
       client.clientIp || "",
       client.macAddress || "",
+      client.protected ? "always allowed" : "",
       client.approvedUntil ? `expires ${formatFuture(client.approvedUntil)}` : "",
       client.lastSeenAt ? `last seen ${formatUpdated(client.lastSeenAt)}` : ""
     ].filter(Boolean).join(" / ");
-    const actions = status === "approved"
+    const actions = client.protected
+      ? ""
+      : status === "approved"
       ? `<button class="text-button" type="button" data-dns-action="revoke" data-client-ip="${escapeAttr(client.clientIp)}">Revoke</button>`
       : status === "denied"
       ? `<button class="text-button" type="button" data-dns-action="approve-permanent" data-client-ip="${escapeAttr(client.clientIp)}">Approve</button>`
@@ -426,7 +429,7 @@ function renderDnsAccess() {
           <p>${escapeHtml(meta || "No recent DNS attempts recorded")}</p>
         </div>
         <div class="dns-client-actions">
-          <span class="pill ${escapeAttr(statusTone(status))}">${escapeHtml(status)}</span>
+          <span class="pill ${escapeAttr(statusTone(status))}">${escapeHtml(client.protected ? "protected" : status)}</span>
           ${actions}
         </div>
       </article>

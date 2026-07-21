@@ -109,6 +109,15 @@ DNS_ACCESS_ENABLED = env("JARAD_DNS_ACCESS_ENABLED", "0", "HOMELAB_DNS_ACCESS_EN
 DNS_ACCESS_LAN_SUBNET = env("JARAD_DNS_LAN_SUBNET", "10.0.0.0/24", "HOMELAB_DNS_LAN_SUBNET")
 DNS_ACCESS_SERVER_IP = env("JARAD_DNS_SERVER_IP", LAN_IP, "HOMELAB_DNS_SERVER_IP")
 DNS_ACCESS_HELPER = env("JARAD_DNS_ACCESS_HELPER", "/usr/local/sbin/jarad-dns-access", "HOMELAB_DNS_ACCESS_HELPER")
+DNS_ACCESS_PROTECTED_CLIENT_IPS = tuple(
+    client_ip.strip()
+    for client_ip in env(
+        "JARAD_DNS_PROTECTED_CLIENT_IPS",
+        "",
+        "HOMELAB_DNS_PROTECTED_CLIENT_IPS",
+    ).split(",")
+    if client_ip.strip()
+)
 DOCKER_HELPER = env("JARAD_DOCKER_HELPER", "/usr/local/sbin/jarad-docker", "HOMELAB_DOCKER_HELPER")
 
 LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}

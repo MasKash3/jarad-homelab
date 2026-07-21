@@ -8,7 +8,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .command import run_command
-from .config import DB_PATH, DNS_ACCESS_ENABLED, DNS_ACCESS_HELPER, DNS_ACCESS_LAN_SUBNET, DNS_ACCESS_SERVER_IP
+from .config import (
+    DB_PATH,
+    DNS_ACCESS_ENABLED,
+    DNS_ACCESS_HELPER,
+    DNS_ACCESS_LAN_SUBNET,
+    DNS_ACCESS_PROTECTED_CLIENT_IPS,
+    DNS_ACCESS_SERVER_IP,
+)
 from .file_security import ensure_owner_only_file
 from .redaction import redact_sensitive_text
 
@@ -61,6 +68,7 @@ def init() -> None:
             db.execute("ALTER TABLE dns_clients ADD COLUMN display_name TEXT")
         db.execute("CREATE INDEX IF NOT EXISTS idx_dns_clients_status ON dns_clients(status)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_dns_clients_last_seen_at ON dns_clients(last_seen_at)")
+    ensure_protected_clients()
 
 
 def validate_client_ip(client_ip: str) -> str:
@@ -83,6 +91,40 @@ def validate_duration(duration: str) -> str:
     if normalized not in VALID_DURATIONS:
         raise ValueError("Unsupported approval duration")
     return normalized
+
+
+def protected_client_ips() -> tuple[str, ...]:
+    protected: set[str] = set()
+    for configured_ip in DNS_ACCESS_PROTECTED_CLIENT_IPS:
+        try:
+            protected.add(validate_client_ip(configured_ip))
+        except ValueError as exc:
+            raise ValueError(f"Invalid protected DNS client IP: {configured_ip}") from exc
+    return tuple(sorted(protected, key=ipaddress.ip_address))
+
+
+def is_protected_client(client_ip: str) -> bool:
+    return validate_client_ip(client_ip) in protected_client_ips()
+
+
+def ensure_protected_clients() -> None:
+    now = utc_now()
+    with connect() as db:
+        for client_ip in protected_client_ips():
+            db.execute(
+                """
+                INSERT INTO dns_clients
+                    (client_ip, status, first_seen_at, last_seen_at, approved_at, source)
+                VALUES (?, 'approved', ?, ?, ?, 'config')
+                ON CONFLICT(client_ip) DO UPDATE SET
+                    status = 'approved',
+                    approved_at = COALESCE(dns_clients.approved_at, excluded.approved_at),
+                    approved_until = NULL,
+                    denied_at = NULL,
+                    revoked_at = NULL
+                """,
+                (client_ip, iso(now), iso(now), iso(now)),
+            )
 
 
 def record_pending_client(client_ip: str, *, hostname: str | None = None, mac_address: str | None = None, source: str = "detected") -> dict[str, Any]:
@@ -117,6 +159,8 @@ def record_pending_client(client_ip: str, *, hostname: str | None = None, mac_ad
 def approve_client(client_ip: str, duration: str) -> tuple[dict[str, Any], dict[str, Any]]:
     client_ip = validate_client_ip(client_ip)
     duration = validate_duration(duration)
+    if is_protected_client(client_ip):
+        duration = "permanent"
     now = utc_now()
     delta = VALID_DURATIONS[duration]
     approved_until = now + delta if delta else None
@@ -142,6 +186,8 @@ def approve_client(client_ip: str, duration: str) -> tuple[dict[str, Any], dict[
 
 def deny_client(client_ip: str) -> tuple[dict[str, Any], dict[str, Any]]:
     client_ip = validate_client_ip(client_ip)
+    if is_protected_client(client_ip):
+        raise ValueError("Protected DNS client cannot be denied")
     now = utc_now()
     with connect() as db:
         db.execute(
@@ -165,6 +211,8 @@ def deny_client(client_ip: str) -> tuple[dict[str, Any], dict[str, Any]]:
 
 def revoke_client(client_ip: str) -> tuple[dict[str, Any], dict[str, Any]]:
     client_ip = validate_client_ip(client_ip)
+    if is_protected_client(client_ip):
+        raise ValueError("Protected DNS client cannot be revoked")
     now = utc_now()
     with connect() as db:
         db.execute(
@@ -212,6 +260,7 @@ def update_client_label(client_ip: str, display_name: str | None) -> dict[str, A
 
 
 def list_clients() -> dict[str, Any]:
+    ensure_protected_clients()
     expire_clients()
     detected = collect_detected_clients()
     firewall = apply_firewall_rules() if DNS_ACCESS_ENABLED else {
@@ -254,7 +303,9 @@ def approved_client_ips() -> list[str]:
             """,
             (iso(now),),
         ).fetchall()
-    return [row["client_ip"] for row in rows]
+    approved_ips = {row["client_ip"] for row in rows}
+    approved_ips.update(protected_client_ips())
+    return sorted(approved_ips, key=ipaddress.ip_address)
 
 
 def expire_clients() -> None:
@@ -346,9 +397,10 @@ def sync_firewall_state() -> dict[str, Any]:
 
 
 def serialize_client(row: sqlite3.Row, now: datetime) -> dict[str, Any]:
+    protected = row["client_ip"] in protected_client_ips()
     approved_until = parse_iso(row["approved_until"])
     expired = row["status"] == "approved" and approved_until is not None and approved_until <= now
-    effective_status = "expired" if expired else row["status"]
+    effective_status = "approved" if protected else "expired" if expired else row["status"]
     return {
         "clientIp": row["client_ip"],
         "displayName": row["display_name"],
@@ -363,6 +415,7 @@ def serialize_client(row: sqlite3.Row, now: datetime) -> dict[str, Any]:
         "deniedAt": row["denied_at"],
         "revokedAt": row["revoked_at"],
         "source": row["source"],
+        "protected": protected,
         "expiresInSeconds": max(0, int((approved_until - now).total_seconds())) if approved_until else None,
     }
 
