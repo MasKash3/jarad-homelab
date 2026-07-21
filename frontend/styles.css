@@ -1132,6 +1132,7 @@ button {
 .dns-client-title-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
 }
@@ -1139,6 +1140,13 @@ button {
 .dns-client-title-row strong {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.dns-protected-pill {
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .text-button.compact {

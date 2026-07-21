@@ -1,8 +1,8 @@
-import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.21.1';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.21.1';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.21.1';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.21.1';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, serviceHealthLabel, stateClass, toneClass } from './js/utils.js?v=2026.07.21.1';
+import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.21.2';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.21.2';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.21.2';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.21.2';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, serviceHealthLabel, stateClass, toneClass } from './js/utils.js?v=2026.07.21.2';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -402,7 +402,7 @@ function renderDnsAccess() {
     const status = client.effectiveStatus || client.status || "pending";
     const clientLabel = client.displayName || client.hostname || "Unnamed device";
     const meta = [
-      client.clientIp || "",
+      client.protected ? "" : client.clientIp || "",
       client.macAddress || "",
       client.protected ? "always allowed" : "",
       client.approvedUntil ? `expires ${formatFuture(client.approvedUntil)}` : "",
@@ -424,14 +424,17 @@ function renderDnsAccess() {
         <div>
           <div class="dns-client-title-row">
             <strong>${escapeHtml(clientLabel)}</strong>
+            ${client.protected ? '<span class="pill good dns-protected-pill">Protected</span>' : ""}
             <button class="text-button compact" type="button" data-dns-label="${escapeAttr(client.clientIp)}">${escapeHtml(client.displayName ? "Rename" : "Name")}</button>
           </div>
           <p>${escapeHtml(meta || "No recent DNS attempts recorded")}</p>
         </div>
-        <div class="dns-client-actions">
-          <span class="pill ${escapeAttr(statusTone(status))}">${escapeHtml(client.protected ? "protected" : status)}</span>
-          ${actions}
-        </div>
+        ${client.protected ? "" : `
+          <div class="dns-client-actions">
+            <span class="pill ${escapeAttr(statusTone(status))}">${escapeHtml(status)}</span>
+            ${actions}
+          </div>
+        `}
       </article>
     `;
   }).join("") || emptyState("No DNS clients recorded yet.");
