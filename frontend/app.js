@@ -1,8 +1,8 @@
-import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.22.2';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.22.2';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.22.2';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.22.2';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, serviceHealthLabel, stateClass, toneClass } from './js/utils.js?v=2026.07.22.2';
+import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.22.3';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.22.3';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.22.3';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.22.3';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, serviceHealthLabel, stateClass, toneClass } from './js/utils.js?v=2026.07.22.3';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -542,6 +542,7 @@ function renderConfig() {
 
 function renderAudit() {
   if (state.isEmpty || connectionState.mode !== "live") {
+    // xss-reviewed: dynamic template values use escaping or whitelist helpers.
     $("#auditList").innerHTML = emptyState("Connect to the backend to view local audit entries.");
     return;
   }
