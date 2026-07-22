@@ -1,8 +1,8 @@
-import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.21.2';
-import { createNoDataState } from './js/empty-state.js?v=2026.07.21.2';
-import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.21.2';
-import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.21.2';
-import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, serviceHealthLabel, stateClass, toneClass } from './js/utils.js?v=2026.07.21.2';
+import { APP_VERSION, legacyStorageKeys, serviceActions, storageKeys } from './js/config.js?v=2026.07.22.1';
+import { createNoDataState } from './js/empty-state.js?v=2026.07.22.1';
+import { clearBrowserSession, createApi, validateBackendBaseUrl } from './js/api.js?v=2026.07.22.1';
+import { defaultDeviceLabel, registerPasskey, verifyPasskeyForAction } from './js/auth.js?v=2026.07.22.1';
+import { $, $$, diagnosticState, emptyState, escapeAttr, escapeHtml, formatFuture, formatUpdated, labelForState, resourceRow, safeUrl, serviceColorClass, serviceHealthLabel, stateClass, toneClass } from './js/utils.js?v=2026.07.22.1';
 
 let serviceFilter = "all";
 let logFilter = "all";
@@ -276,8 +276,8 @@ function renderAlerts() {
   const active = state.alerts.filter((alert) => alert.time === "Active").length;
   const hasCritical = state.alerts.some((alert) => alert.time === "Active" && alert.state === "bad");
   const hasWarning = state.alerts.some((alert) => alert.time === "Active" && alert.state === "warn");
-  $("#activeAlertCount").textContent = `${active} active`;
-  $("#activeAlertCount").className = `pill ${hasCritical ? "bad" : hasWarning ? "warn" : "good"}`;
+  $("#activeAlertCount").textContent = state.isEmpty ? "Disconnected" : `${active} active`;
+  $("#activeAlertCount").className = `pill ${state.isEmpty ? "warn" : hasCritical ? "bad" : hasWarning ? "warn" : "good"}`;
   // xss-reviewed: dynamic template values use escaping or whitelist helpers.
   $("#alertList").innerHTML = state.alerts.map((alert) => `
     <article class="alert-card ${escapeAttr(alert.state)}">
@@ -296,6 +296,10 @@ function renderAlerts() {
       <strong>${escapeHtml(value)}</strong>
     </div>
   `).join("");
+  const dnsStatus = state.network.find(([label]) => label === "DNS")?.[1];
+  const dnsHealthy = dnsStatus === "OK";
+  $("#dnsState").textContent = state.isEmpty ? "DNS unavailable" : dnsHealthy ? "DNS OK" : `DNS ${dnsStatus || "unknown"}`;
+  $("#dnsState").className = `pill ${state.isEmpty ? "warn" : dnsHealthy ? "good" : "bad"}`;
   renderDnsAccess();
 }
 
@@ -325,6 +329,7 @@ function renderDrives() {
   $("#driveSummary").className = `pill ${summaryTone}`;
   $("#driveHelp").textContent = drives.message || "Drive health data is unavailable.";
   $("#driveHelp").className = `config-help ${summaryTone}`;
+  $("#driveHelp").hidden = !drives.available;
 
   const scrutinyService = (state.services || []).find((service) => service.id === "scrutiny");
   const scrutinyUrl = scrutinyService?.url ? safeUrl(scrutinyService.url) : "#";

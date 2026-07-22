@@ -43,7 +43,7 @@ export function createNoDataState(reason = "Connect to the Jarad backend to load
       {
         state: "warn",
         title: "No live backend connection",
-        time: "Active",
+        time: "Disconnected",
         body: reason
       }
     ],
